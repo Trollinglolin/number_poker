@@ -1,0 +1,19 @@
+{
+  "name": "number-poker",
+  "version": "1.0.0",
+  "description": "A mathematical card game combining poker and arithmetic operations",
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@chakra-ui/form-control": "^2.2.0",
+    "@chakra-ui/modal": "^2.3.1",
+    "@chakra-ui/toast": "^7.0.2"
+  }
+}

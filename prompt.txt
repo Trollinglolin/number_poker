@@ -1,0 +1,20 @@
+Build a web game:
+the game is called number poker.
+Rules:
+-In a deck, there are 4 sests of cards numbered 1-10, the four sets are coloured gold, silver, bronze and dark, ,4 division notation cards and 4 sqaure root notation cards.
+-each player will own an add notation card, a minus notation card and a multiply notation card at the start of each round.
+-each player will then distributed 4 cards, when a card is division notation, a player have to select one notation card he has to trade with to division card. if a card is sqaure root card, one more card will be distributed to that player.
+-only the last number card will be a secret, any other cards will be disclosed to other players.
+-there will be 3 betting rounds, the first one is before any cards in the deck are distrbuted, everyone have to pay 1 chip to play. the second betting round is after 2 number cards are distributed to each player, and the third betting round is after 4 number cards are distributed.
+-betting round follow the rules of texas holdem.
+-after all the betting rounds, each player have to use their own cards to peice together a math equation.
+-there are two possible goals, first one is get the equation outcome as close to 1, second is get as close to 20.
+-after every player pieced together their own equation, eaach player can select to bet small(close to 1) or big(close to 20) or both.
+-players who bet small compete with each other, the closest to 1 will be the winner of small
+-players who bet big compete with each other, the closest to 20 will be the winner of big
+-players who bet both have to win both small and big in order to win the round.
+-tiebreaker rules:
+    - in small, if both player have the same number outcome, look at the smallest number card's color, gold is biggest, then silver, then bronze, then black.
+    - in big, if both player have the same number outcome, look at the biggest number cards's color, same as above.
+-the pool of chips will be distributed evenly to the big winner and small winner, if a player bet both and wins, he get all of the pool chips.
+-the next round continues

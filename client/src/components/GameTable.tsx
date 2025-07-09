@@ -114,10 +114,10 @@ const PlayerHand: React.FC<{
   const numberCards = player.cards.filter(card => card.type === 'number');
   const operationCards = player.cards.filter(card => card.type === 'operation');
 
-  // For other players, show all but the last number card
+  // For other players, show all but the first number card
   const visibleNumberCards = player.id === currentPlayerId 
     ? numberCards 
-    : numberCards.slice(0, -1);
+    : numberCards.slice(1, 4); 
 
   // For other players, show all operation cards
   const visibleOperationCards = player.id === currentPlayerId 
@@ -452,6 +452,8 @@ export const GameTable: React.FC = () => {
             <Flex>
               <Text>Pot: {game.pot} chips</Text>
               <Spacer />
+              <Text>Game ID: {game.id}</Text>
+              <Spacer />
               <Text>Current Bet: {game.currentBet} chips</Text>
               <Spacer />
               <Badge colorScheme="purple">Phase: {game.phase}</Badge>
@@ -490,7 +492,7 @@ export const GameTable: React.FC = () => {
         </Grid>
 
         {/* Show equation phase UI when it's the player's turn */}
-        {game.phase === 'equation' && currentPlayer && currentPlayer.id === game.currentPlayer && !currentPlayer.isFolded && (
+        {game.phase === 'equation' && currentPlayer && !currentPlayer.isFolded && (
           <Box w="100%" p={4} borderWidth={1} borderRadius="md" bg="blue.50">
             <VStack spacing={4} as={Stack} {...({ spacing: 4 } as ExtendedStackProps)}>
               <Text fontSize="lg" fontWeight="bold">Equation Phase</Text>

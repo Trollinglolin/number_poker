@@ -13,6 +13,7 @@ interface GameContextType {
   joinGame: (gameId: string, playerName: string) => Promise<void>;
   startGame: () => Promise<void>;
   performAction: (action: GameAction) => void;
+  socket: Socket | null;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -363,7 +364,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createGame,
     joinGame,
     startGame,
-    performAction
+    performAction,
+    socket: socketRef.current
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

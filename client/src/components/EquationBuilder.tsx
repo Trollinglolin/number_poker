@@ -293,6 +293,12 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
 
       // Add card to target slot
       const slotIndex = parseInt(overId.split('-')[2]);
+
+      if (targetSlots[slotIndex].card) {
+      // If slot already has a card, add it back to available cards
+      setAvailableCards(prev => [...prev, targetSlots[slotIndex].card!]);
+      }
+      
       const newSlots = [...targetSlots];
       newSlots[slotIndex] = { ...newSlots[slotIndex], card };
       setTargetSlots(newSlots);

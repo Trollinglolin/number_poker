@@ -25,6 +25,8 @@ export interface Player {
   isActive: boolean;
   isFolded: boolean;
   submittedEquations?: { small?: string; big?: string };
+  isSquareRoot: boolean;
+  hasMultiply: boolean;
 }
 
 export interface GameState {

@@ -15,7 +15,7 @@ export class GameService {
   }
 
   createGame(): GameState {
-    const gameId = uuidv4();
+    const gameId = Math.floor(Math.random() * 10000).toString();
     const game: GameState = {
       id: gameId,
       players: [],
@@ -62,7 +62,9 @@ export class GameService {
       bet: 0,
       betType: null,
       isActive: true,
-      isFolded: false
+      isFolded: false,
+      isSquareRoot: false,
+      hasMultiply: false
     };
 
     game.players.push(player);
@@ -91,7 +93,9 @@ export class GameService {
         bet: 0,
         betType: null,
         isActive: true,
-        isFolded: false
+        isFolded: false,
+        isSquareRoot: false,
+        hasMultiply: false
       };
       game.players.push(botPlayer);
     }
@@ -221,7 +225,7 @@ export class GameService {
       throw new Error('Player not found');
     }
 
-    if (player.id !== game.currentPlayer) {
+    if (player.id !== game.currentPlayer && game.phase !== 'equation') {
       throw new Error('Not your turn');
     }
 
@@ -311,9 +315,10 @@ export class GameService {
             this.resolveEquationsAndDistributePot(game);
             this.advanceGamePhase(game);
           } else {
-            this.moveToNextPlayer(game);
-            this.notifyGameUpdate(game.id);
+            // this.moveToNextPlayer(game);
+            // this.notifyGameUpdate(game.id);
           }
+          this.notifyGameUpdate(game.id);
           break;
         default:
           throw new Error('Invalid action');
@@ -568,13 +573,7 @@ export class GameService {
   }
 
   private determineWinners(game: GameState): void {
-    // For testing, just make the human player win
-    const humanPlayer = game.players.find((p: Player) => p.id !== 'bot-1');
-    if (humanPlayer) {
-      game.winners.small = [humanPlayer.id];
-      game.winners.big = [humanPlayer.id];
-      humanPlayer.chips += game.pot;
-    }
+    this.resolveEquationsAndDistributePot(game); 
   }
 
   private dealInitialCards(game: GameState): void {
@@ -597,9 +596,20 @@ export class GameService {
         }
 
         const card = game.deck.pop()!;
+
+        if (card.type === 'operation' && card.operation === 'squareRoot'){
+          console.log('Player received square root card, adding to operation cards:');
+          player.isSquareRoot = true;
+          player.cards.push(card);
+          continue;
+        }
         
         // Handle multiply card swapping
         if (card.type === 'operation' && card.operation === 'multiply') {
+          if (player.isSquareRoot) {
+            console.error('Cannot swap multiply card while player has square root card');
+            continue; // Skip swapping if player has square root card
+          }
           console.log('Player received multiply card, initiating swap:', { 
             playerId: player.id, 
             playerName: player.name,
@@ -636,6 +646,7 @@ export class GameService {
           // For other operation cards, just add them
           player.cards.push(card);
         }
+        player.isSquareRoot = false; // Reset square root status for next card
       }
     }
 
@@ -671,7 +682,7 @@ export class GameService {
     
     // Add number cards
     for (const color of colors) {
-      for (let value = 1; value <= 10; value++) {
+      for (let value = 0; value <= 10; value++) {
         deck.push({ type: 'number', value, color });
       }
     }
@@ -724,13 +735,57 @@ export class GameService {
   }
 
   private resolveEquationsAndDistributePot(game: GameState): void {
-    // Helper to safely evaluate a math expression string
+    // Helper to safely evaluate a math expression string (using same logic as EquationBuilder)
     function safeEval(expr: string): number | null {
       try {
-        // Only allow numbers, parentheses, and math operators
-        if (!/^[0-9+\-*/().\s]+$/.test(expr)) return null;
-        // eslint-disable-next-line no-eval
-        const result = eval(expr);
+        // Convert equation to tokens with proper grouping for square root
+        const tokens: Array<{ type: 'number' | 'operator' | 'sqrt', value: string }> = [];
+        const parts = expr.split(/(sqrt|[\+\-\*\/\(\)])/).filter(p => p.trim());
+        
+        let i = 0;
+        while (i < parts.length) {
+          const part = parts[i].trim();
+          if (!part) {
+            i++;
+            continue;
+          }
+
+          if (/^\d+$/.test(part)) {
+            tokens.push({ type: 'number', value: part });
+          } else if (part === 'sqrt') {
+            // Look ahead for the next number or expression in parentheses
+            const nextPart = parts[i + 1]?.trim();
+            if (nextPart?.startsWith('(')) {
+              tokens.push({ type: 'sqrt', value: `Math.sqrt${nextPart}` });
+              i++; // Skip the next part since we've included it
+            } else if (nextPart && /^\d+$/.test(nextPart)) {
+              tokens.push({ type: 'sqrt', value: `Math.sqrt(${nextPart})` });
+              i++; // Skip the next number
+            } else {
+              return null; // Invalid square root
+            }
+          } else if (['+','-','*','/'].includes(part)) {
+            tokens.push({ 
+              type: 'operator', 
+              value: part === '*' ? '*' :
+                     part === '/' ? '/' :
+                     part === '+' ? '+' :
+                     part === '-' ? '-' : ''
+            });
+          }
+          i++;
+        }
+
+        if (tokens.length === 0) return null;
+
+        // Build the equation string with proper grouping
+        let equation = '';
+        for (const token of tokens) {
+          equation += token.value;
+        }
+
+        // Use Function constructor to safely evaluate
+        const result = new Function(`return ${equation}`)();
         return isFinite(result) ? result : null;
       } catch {
         return null;
@@ -782,41 +837,80 @@ export class GameService {
         equations: eqResults
       });
     }
+    // Card color values (ascending order)
+    const colorValues: Record<string, number> = {
+      'dark': 0,
+      'bronze': 1,
+      'silver': 2,
+      'gold': 3
+    };
 
-    // Find winners
-    let smallWinner: Player | null = null;
-    let bigWinner: Player | null = null;
+    // Find winners with tiebreaker logic
+    let smallWinners: Player[] = [];
+    let bigWinners: Player[] = [];
     let minSmallDiff = Infinity;
     let minBigDiff = Infinity;
 
+    // Check if all players bet the same type
+    const allSmall = results.every(r => r.player.betType === 'small');
+    const allBig = results.every(r => r.player.betType === 'big');
+
+    // First pass: find closest to target
     for (const r of results) {
       if (typeof r.small === 'number') {
         const diff = Math.abs(r.small - 1);
         if (diff < minSmallDiff) {
           minSmallDiff = diff;
-          smallWinner = r.player;
+          smallWinners = [r.player];
+        } else if (diff === minSmallDiff) {
+          smallWinners.push(r.player);
         }
       }
       if (typeof r.big === 'number') {
         const diff = Math.abs(r.big - 20);
         if (diff < minBigDiff) {
           minBigDiff = diff;
-          bigWinner = r.player;
+          bigWinners = [r.player];
+        } else if (diff === minBigDiff) {
+          bigWinners.push(r.player);
         }
       }
     }
 
+    // Apply tiebreakers
+    const smallWinner = smallWinners.length > 0 ? smallWinners.reduce((a, b) => {
+      // For small bet: compare smallest card's color (ascending order)
+      const aMinCard = Math.min(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+      const bMinCard = Math.min(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+      return aMinCard < bMinCard ? a : b;
+    }) : null;
+
+    const bigWinner = bigWinners.length > 0 ? bigWinners.reduce((a, b) => {
+      // For big bet: compare biggest card's color (ascending order)
+      const aMaxCard = Math.max(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+      const bMaxCard = Math.max(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+      return aMaxCard > bMaxCard ? a : b;
+    }) : null;
+
     // Store equation results in game state for client display
     game.equationResults = equationResults;
 
-    // Distribute pot
-    if (smallWinner && bigWinner && smallWinner.id === bigWinner.id) {
+    // Distribute pot with tiebreaker support
+    if (allSmall && smallWinner) {
+      // All players bet small - single winner takes full pot
+      smallWinner.chips += game.pot;
+      game.winners.small = [smallWinner.id];
+    } else if (allBig && bigWinner) {
+      // All players bet big - single winner takes full pot
+      bigWinner.chips += game.pot;
+      game.winners.big = [bigWinner.id];
+    } else if (smallWinner && bigWinner && smallWinner.id === bigWinner.id) {
       // One player wins both
       smallWinner.chips += game.pot;
       game.winners.small = [smallWinner.id];
       game.winners.big = [bigWinner.id];
     } else {
-      // Split pot
+      // Split pot (tiebreakers already applied)
       if (smallWinner) {
         smallWinner.chips += Math.floor(game.pot / 2);
         game.winners.small = [smallWinner.id];

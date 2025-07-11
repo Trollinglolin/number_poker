@@ -2,7 +2,7 @@
   "name": "client",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://trollinglolin.github.io/devils_plan/",
+  "homepage": "http://localhost:3000",
   "dependencies": {
     "@chakra-ui/form-control": "^2.2.0",
     "@chakra-ui/icons": "^2.2.4",

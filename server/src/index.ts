@@ -29,8 +29,8 @@ app.use('/api/games', createGameRoutes(gameService));
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  socket.on('joinGame', ({ gameId }) => {
-    console.log('Client joining game room:', { socketId: socket.id, gameId });
+  socket.on('joinGame', ({ gameId, playerId }) => {
+    console.log('Client joining game room:', { socketId: socket.id, gameId, playerId });
     
     const game = gameService.getGame(gameId);
     if (!game) {
@@ -39,7 +39,15 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Join the game room
     socket.join(gameId);
+    
+    // Also join a personal room for this player if playerId is provided
+    if (playerId) {
+      socket.join(playerId);
+      console.log('Client joined personal room:', playerId);
+    }
+    
     console.log('Client joined game room:', gameId);
     socket.emit('gameUpdate', game);
   });

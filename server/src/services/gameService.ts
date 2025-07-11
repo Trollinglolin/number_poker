@@ -102,7 +102,7 @@ export class GameService {
 
     // Reset game state while preserving chips
     game.deck = this.createDeck();
-    game.phase = 'betting1';
+    game.phase = 'dealing1'; // Start with dealing1 phase
     game.currentPlayer = game.players[0].id;
     game.currentBet = 0;
     game.pot = 0;
@@ -123,11 +123,12 @@ export class GameService {
       player.isActive = true;
       player.isFolded = false;
       player.submittedEquations = undefined;
+      player.hasMultiply = false;
       player.chips = currentChips; // Restore chips
     });
 
     this.dealInitialCards(game);
-    this.notifyGameUpdate(gameId);
+    this.notifyGameUpdate(game.id);
   }
 
   private async handleBotTurn(game: GameState): Promise<void> {
@@ -225,7 +226,8 @@ export class GameService {
       throw new Error('Player not found');
     }
 
-    if (player.id !== game.currentPlayer && game.phase !== 'equation') {
+    // Allow swapCard actions regardless of current player (for card swapping during dealing)
+    if (player.id !== game.currentPlayer && game.phase !== 'equation' && action.type !== 'swapCard') {
       throw new Error('Not your turn');
     }
 
@@ -240,10 +242,16 @@ export class GameService {
     // Check if the action is allowed in the current phase
     const isBettingPhase = game.phase.startsWith('betting');
     const isEquationPhase = game.phase === 'equation';
+    const isDealingPhase = game.phase === 'dealing1' || game.phase === 'dealing2' || game.players.some(p => p.hasMultiply);
 
     // Validate action type against current phase
     if (!isBettingPhase && (action.type === 'bet' || action.type === 'call' || action.type === 'fold' || action.type === 'continue')) {
       throw new Error(`Betting actions are only allowed during betting phases. Current phase: ${game.phase}`);
+    }
+
+    // Prevent betting actions during dealing phase
+    if (isDealingPhase && (action.type === 'bet' || action.type === 'call' || action.type === 'fold' || action.type === 'continue')) {
+      throw new Error(`Betting actions are not allowed during dealing phase. Please wait for all cards to be dealt.`);
     }
 
     if (!isEquationPhase && action.type === 'selectBetType') {
@@ -319,6 +327,12 @@ export class GameService {
             // this.notifyGameUpdate(game.id);
           }
           this.notifyGameUpdate(game.id);
+          break;
+        case 'swapCard':
+          if (!action.swapCardType) {
+            throw new Error('Swap card type is required');
+          }
+          this.handleSwap(game, player, action.swapCardType);
           break;
         default:
           throw new Error('Invalid action');
@@ -479,6 +493,64 @@ export class GameService {
     this.notifyGameUpdate(game.id);
   }
 
+  private handleSwap(game: GameState, player: Player, swapCardType: OperationType): void {
+    console.log('Handling card swap:', { 
+      playerId: player.id, 
+      playerName: player.name,
+      swapCardType,
+      currentOperationCards: player.operationCards.map(c => c.operation)
+    });
+    
+    // Find the card to swap out
+    const cardIndex = player.operationCards.findIndex(card => card.operation === swapCardType);
+    if (cardIndex === -1) {
+      throw new Error(`Card type ${swapCardType} not found in player's operation cards`);
+    }
+    
+    // Remove the selected card
+    const swappedCard = player.operationCards.splice(cardIndex, 1)[0];
+    
+    // Add the multiply card to player's cards
+    const multiplyCard = { type: 'operation' as const, operation: 'multiply' as const };
+    player.cards.push(multiplyCard);
+    
+    // Reset the multiply flag
+    player.hasMultiply = false;
+    
+    console.log('Card swap completed:', {
+      playerId: player.id,
+      playerName: player.name,
+      swappedOut: swappedCard.operation,
+      swappedIn: 'multiply',
+      remainingOperationCards: player.operationCards.map(c => c.operation)
+    });
+    
+    // Continue with dealing the next card
+    this.continueDealing(game);
+    
+    // Notify game update after swap
+    this.notifyGameUpdate(game.id);
+  }
+
+  private continueDealing(game: GameState): void {
+    // Continue dealing cards to complete the current phase
+    const currentPhase = game.phase;
+    let targetCards = 0;
+    
+    if (currentPhase === 'dealing1') {
+      // During dealing1, deal exactly 2 number cards
+      targetCards = 2;
+    } else if (currentPhase === 'dealing2') {
+      // During dealing2, deal exactly 4 number cards
+      targetCards = 4;
+    }
+    
+    if (targetCards > 0) {
+      console.log('Continuing to deal cards after swap:', { targetCards, phase: currentPhase });
+      this.dealCards(game, targetCards, true);
+    }
+  }
+
   private moveToNextPlayer(game: GameState): void {
     // Find the current player's index
     const currentPlayerIndex = game.players.findIndex(p => p.id === game.currentPlayer);
@@ -536,21 +608,10 @@ export class GameService {
 
     // Reset current bet and player bets at the start of new betting rounds
     if (game.phase === 'betting1') {
-      // After first betting round, deal 2 more number cards (total of 4)
-      this.dealCards(game, 4, true); // true indicates we want exactly 4 number cards
-      game.phase = 'betting2';
-      // Reset betting state for second betting round
-      game.currentBet = 0;
-      game.players.forEach(p => p.bet = 0);
-      // Set the first active player as current player for betting2
-      const firstActivePlayer = game.players.find(p => !p.isFolded);
-      if (firstActivePlayer) {
-        game.currentPlayer = firstActivePlayer.id;
-        // Handle bot turns immediately
-        if (game.currentPlayer.startsWith('bot-')) {
-          this.handleBotTurn(game);
-        }
-      }
+      // After first betting round, move to dealing2 phase
+      game.phase = 'dealing2';
+      // Deal additional cards (total of 4)
+      this.dealCards(game, 4, true);
     } else if (game.phase === 'betting2') {
       // After second betting round, move to equation phase
       game.phase = 'equation';
@@ -580,8 +641,12 @@ export class GameService {
     // Deal initial 2 number cards to each player
     this.dealCards(game, 2, true); // true indicates we want exactly 2 number cards
     // After dealing initial cards, automatically advance to betting1
-    game.phase = 'betting1';
-    this.notifyGameUpdate(game.id);
+    // But only if no players are waiting for card swap
+    const waitingForSwap = game.players.some(p => p.hasMultiply);
+    if (!waitingForSwap) {
+      game.phase = 'betting1';
+      this.notifyGameUpdate(game.id);
+    }
   }
 
   private dealCards(game: GameState, targetNumberCards: number, requireExactNumberCards: boolean = false): void {
@@ -589,6 +654,12 @@ export class GameService {
     
     // Deal cards to each player until they have the target number of number cards
     for (const player of game.players) {
+      // Skip players who are waiting for card swap
+      if (player.hasMultiply) {
+        console.log('Player waiting for card swap, skipping:', player.id);
+        continue;
+      }
+      
       while (player.cards.filter(c => c.type === 'number').length < targetNumberCards) {
         if (game.deck.length === 0) {
           console.error('Deck is empty but players still need cards');
@@ -606,6 +677,17 @@ export class GameService {
         
         // Handle multiply card swapping
         if (card.type === 'operation' && card.operation === 'multiply') {
+          // Check if player already has a multiply card
+          const hasMultiplyCard = player.cards.some(c => c.type === 'operation' && c.operation === 'multiply') || player.hasMultiply;
+          if (hasMultiplyCard) {
+            console.log('Player already has multiply card, discarding new one:', { 
+              playerId: player.id, 
+              playerName: player.name 
+            });
+            // Discard the multiply card (don't add it to player's cards)
+            continue;
+          }
+          
           if (player.isSquareRoot) {
             console.error('Cannot swap multiply card while player has square root card');
             continue; // Skip swapping if player has square root card
@@ -616,9 +698,24 @@ export class GameService {
             currentOperationCards: player.operationCards.map(c => c.operation)
           });
           
-          // Only swap if player has operation cards
-          if (player.operationCards.length > 0) {
-            // Randomly select one operation card to swap
+          // Only swap if player has operation cards and is not a bot
+          if (player.operationCards.length > 0 && !player.id.startsWith('bot-')) {
+            // Emit requireSwap event only to the specific player
+            if (this.io) {
+              this.io.to(player.id).emit('requireSwap', {
+                playerId: player.id,
+                playerName: player.name,
+                availableCards: player.operationCards.map(c => c.operation),
+                multiplyCard: card
+              });
+            }
+            // Store the multiply card temporarily and wait for swap response
+            player.hasMultiply = true;
+            // Stop dealing cards and wait for this player's swap response
+            console.log('Stopping card dealing to wait for swap response from:', player.id);
+            return;
+          } else if (player.id.startsWith('bot-')) {
+            // For bots, randomly select one operation card to swap
             const randomIndex = Math.floor(Math.random() * player.operationCards.length);
             const swappedCard = player.operationCards[randomIndex];
             
@@ -628,7 +725,7 @@ export class GameService {
             // Add the multiply card to player's cards
             player.cards.push(card);
             
-            console.log('Card swap completed:', {
+            console.log('Bot card swap completed:', {
               playerId: player.id,
               playerName: player.name,
               swappedOut: swappedCard.operation,
@@ -651,12 +748,20 @@ export class GameService {
     }
 
     // Verify that all players have exactly the target number of number cards
+    // Skip players who are waiting for card swap
     const allPlayersHaveTargetCards = game.players.every(p => 
-      p.cards.filter(c => c.type === 'number').length === targetNumberCards
+      p.hasMultiply || p.cards.filter(c => c.type === 'number').length === targetNumberCards
     );
 
     if (requireExactNumberCards && !allPlayersHaveTargetCards) {
       console.error('Not all players have the required number of number cards');
+      // Check if any player is waiting for swap
+      const waitingForSwap = game.players.some(p => p.hasMultiply);
+      if (waitingForSwap) {
+        console.log('Some players are waiting for card swap, not retrying deal');
+        return;
+      }
+      
       // Put all cards back in the deck and try again
       for (const player of game.players) {
         while (player.cards.length > 0) {
@@ -672,6 +777,40 @@ export class GameService {
       return;
     }
 
+    // Check if we need to advance the game phase after dealing
+    const waitingForSwap = game.players.some(p => p.hasMultiply);
+    if (!waitingForSwap) {
+      // If we're in dealing1 phase and all players have 2 cards, advance to betting1
+      if (game.phase === 'dealing1') {
+        const allPlayersHave2Cards = game.players.every(p => 
+          p.cards.filter(c => c.type === 'number').length >= 2
+        );
+        if (allPlayersHave2Cards) {
+          console.log('All players have 2 cards, advancing to betting1');
+          game.phase = 'betting1';
+        }
+      }
+      // If we're in dealing2 phase and all players have 4 cards, advance to betting2
+      else if (game.phase === 'dealing2') {
+        const allPlayersHave4Cards = game.players.every(p => 
+          p.cards.filter(c => c.type === 'number').length >= 4
+        );
+        if (allPlayersHave4Cards) {
+          console.log('All players have 4 cards, advancing to betting2');
+          game.phase = 'betting2';
+          game.currentBet = 0;
+          game.players.forEach(p => p.bet = 0);
+          const firstActivePlayer = game.players.find(p => !p.isFolded);
+          if (firstActivePlayer) {
+            game.currentPlayer = firstActivePlayer.id;
+            if (game.currentPlayer.startsWith('bot-')) {
+              this.handleBotTurn(game);
+            }
+          }
+        }
+      }
+    }
+    
     // Notify after dealing cards
     this.notifyGameUpdate(game.id);
   }

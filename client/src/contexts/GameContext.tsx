@@ -14,6 +14,13 @@ interface GameContextType {
   startGame: () => Promise<void>;
   performAction: (action: GameAction) => void;
   socket: Socket | null;
+  swapRequest: {
+    playerId: string;
+    playerName: string;
+    availableCards: string[];
+    multiplyCard: any;
+  } | null;
+  setSwapRequest: (request: any) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -31,6 +38,12 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [swapRequest, setSwapRequest] = useState<{
+    playerId: string;
+    playerName: string;
+    availableCards: string[];
+    multiplyCard: any;
+  } | null>(null);
   const joinInProgress = useRef(false);
   const lastJoinedGame = useRef<string | null>(null);
   const pendingGameJoin = useRef<{ gameId: string; playerId: string } | null>(null);
@@ -62,7 +75,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (pendingGameJoin.current) {
           const { gameId, playerId } = pendingGameJoin.current;
           console.log('Processing pending game join:', { gameId, playerId });
-          newSocket.emit('joinGame', { gameId });
+          newSocket.emit('joinGame', { gameId, playerId });
           pendingGameJoin.current = null;
         }
       });
@@ -176,6 +189,27 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isClosable: true,
         });
       });
+
+      newSocket.on('requireSwap', (swapData: {
+        playerId: string;
+        playerName: string;
+        availableCards: string[];
+        multiplyCard: any;
+      }) => {
+        console.log('Received swap request:', swapData);
+        // Set swap request - the modal will check if it's for the current player
+        setSwapRequest(swapData);
+        // Only show toast if it's for the current player
+        if (swapData.playerId === playerId) {
+          toast({
+            title: 'Card Swap Required',
+            description: `You received a multiply card! Choose which operation card to swap.`,
+            status: 'info',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      });
     }
 
     // Only clean up on component unmount
@@ -265,7 +299,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Handle socket room joining
       if (socketRef.current?.connected) {
         console.log('Socket ready, joining game room:', gameId);
-        socketRef.current.emit('joinGame', { gameId });
+        socketRef.current.emit('joinGame', { gameId, playerId: newPlayerId });
         
         // Fetch current game state after joining
         try {
@@ -365,7 +399,9 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     joinGame,
     startGame,
     performAction,
-    socket: socketRef.current
+    socket: socketRef.current,
+    swapRequest,
+    setSwapRequest
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

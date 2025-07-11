@@ -33,7 +33,7 @@ import {
   ModalFooter
 } from '@chakra-ui/react';
 import { useGame } from '../contexts/GameContext';
-import { Card as GameCard, Player, GameAction, GameState } from '../shared/types';
+import { Card as GameCard, Player, GameAction, GameState, OperationType } from '../shared/types';
 import { EquationBuilder } from './EquationBuilder';
 
 // Extend StackProps to include spacing
@@ -237,13 +237,46 @@ const PlayerHand: React.FC<{
 };
 
 export const GameTable: React.FC = () => {
-  const { game, playerId, performAction, startGame } = useGame();
+  const { game, playerId, performAction, startGame, swapRequest, setSwapRequest } = useGame();
   const [betAmount, setBetAmount] = useState<number>(0);
   const [isBetting, setIsBetting] = useState(false);
   const [isStartingNewRound, setIsStartingNewRound] = useState(false);
   const toast = useToast();
   const lastPhaseRef = React.useRef<string>('');
   const lastCurrentPlayerRef = React.useRef<string>('');
+
+  // Handle card swap
+  const handleCardSwap = (swapCardType: OperationType) => {
+    if (!swapRequest) return;
+    
+    try {
+      performAction({
+        type: 'swapCard',
+        playerId: swapRequest.playerId,
+        swapCardType
+      });
+      
+      // Clear the swap request
+      setSwapRequest(null);
+      
+      toast({
+        title: 'Card Swapped',
+        description: `Successfully swapped ${swapCardType} for multiply card`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error swapping card:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to swap card',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
 
   // Move handlePlaceBet outside of conditional rendering
   const handlePlaceBet = useCallback(async () => {
@@ -627,6 +660,36 @@ export const GameTable: React.FC = () => {
               Place Bet
             </Button>
           </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Card Swap Modal */}
+      <Modal isOpen={!!swapRequest && swapRequest.playerId === playerId} onClose={() => setSwapRequest(null)} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Choose Card to Swap</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <Text>You received a multiply card! Choose which operation card you want to swap:</Text>
+              <HStack spacing={4} wrap="wrap">
+                {swapRequest?.availableCards.map((cardType) => (
+                  <Button
+                    key={cardType}
+                    colorScheme="blue"
+                    size="lg"
+                    onClick={() => handleCardSwap(cardType as OperationType)}
+                  >
+                    {cardType === 'add' ? '+' : 
+                     cardType === 'subtract' ? '-' : 
+                     cardType === 'multiply' ? '×' : 
+                     cardType === 'divide' ? '÷' : 
+                     cardType === 'squareRoot' ? '√' : cardType}
+                  </Button>
+                ))}
+              </HStack>
+            </VStack>
+          </ModalBody>
         </ModalContent>
       </Modal>
     </Container>

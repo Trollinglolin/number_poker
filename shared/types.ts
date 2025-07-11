@@ -36,7 +36,7 @@ export interface GameState {
   currentPlayer: string;
   pot: number;
   currentBet: number;
-  phase: 'waiting' | 'betting1' | 'dealing1' | 'betting2' | 'dealing2' | 'betting3' | 'dealing3' | 'equation' | 'final' | 'ended';
+  phase: 'waiting' | 'dealing1' | 'betting1' | 'dealing2' | 'betting2' | 'equation' | 'final' | 'ended';
   round: number;
   winners: {
     small: string[];
@@ -57,12 +57,13 @@ export interface GameState {
 }
 
 export type GameAction = {
-  type: 'bet' | 'fold' | 'call' | 'raise' | 'selectBetType' | 'submitEquation' | 'continue';
+  type: 'bet' | 'fold' | 'call' | 'raise' | 'selectBetType' | 'submitEquation' | 'continue' | 'swapCard';
   playerId: string;
   amount?: number;
   betType?: 'small' | 'big' | 'both';
   equation?: string;
   equations?: { small?: string; big?: string };
+  swapCardType?: OperationType;
 };
 
 export interface GameEvent {

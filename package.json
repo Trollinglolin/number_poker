@@ -6,7 +6,9 @@
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && npm run dev",
     "client": "cd client && npm start",
-    "install-all": "npm install && cd client && npm install && cd ../server && npm install"
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "build": "cd client && npm run build && cd ../server && npm run build",
+    "start-prod": "cd server && NODE_ENV=production npm start"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

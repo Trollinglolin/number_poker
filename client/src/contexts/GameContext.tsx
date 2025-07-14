@@ -55,7 +55,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!socketInitialized.current) {
       console.log('Initializing socket connection...');
-      const newSocket = io('http://localhost:3001', {
+      
+      // Use relative URL for production, localhost for development
+      const socketUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      
+      const newSocket = io(socketUrl, {
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         transports: ['websocket'],
@@ -225,7 +231,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const createGame = async () => {
     try {
-      const response = await axios.post('http://localhost:3001/api/games');
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      
+      const response = await axios.post(`${baseUrl}/api/games`);
       const gameData = response.data;
       if (!gameData || !gameData.id) {
         throw new Error('Invalid game data received from server');
@@ -271,7 +281,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // (not when creating a new game)
       if (gameId !== lastJoinedGame.current) {
         try {
-          const gameCheck = await axios.get(`http://localhost:3001/api/games/${gameId}`);
+          const baseUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:3001';
+          const gameCheck = await axios.get(`${baseUrl}/api/games/${gameId}`);
           if (!gameCheck.data) {
             throw new Error('Game not found');
           }
@@ -283,7 +296,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      const response = await axios.post(`http://localhost:3001/api/games/${gameId}/join`, {
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      const response = await axios.post(`${baseUrl}/api/games/${gameId}/join`, {
         playerName
       });
       
@@ -303,7 +319,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Fetch current game state after joining
         try {
-          const gameState = await axios.get(`http://localhost:3001/api/games/${gameId}`);
+          const baseUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:3001';
+          const gameState = await axios.get(`${baseUrl}/api/games/${gameId}`);
           setGame(gameState.data);
         } catch (err) {
           console.error('Error fetching game state:', err);
@@ -350,7 +369,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       console.log('Sending start game request...', { gameId });
-      const response = await axios.post(`http://localhost:3001/api/games/${gameId}/start`);
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      const response = await axios.post(`${baseUrl}/api/games/${gameId}/start`);
       console.log('Start game response:', response.data);
       
       // Wait a moment for the socket to receive the update
@@ -359,7 +381,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // If the game hasn't updated, try to fetch the current state
       if (!game || game.phase === 'waiting') {
         console.log('Game state not updated via socket, fetching current state...');
-        const gameResponse = await axios.get(`http://localhost:3001/api/games/${gameId}`);
+        const gameResponse = await axios.get(`${baseUrl}/api/games/${gameId}`);
         setGame(gameResponse.data);
       }
     } catch (error) {

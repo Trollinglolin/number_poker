@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
 import createGameRoutes from './routes/gameRoutes';
 import { GameService } from './services/gameService';
 
@@ -9,7 +10,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: process.env.NODE_ENV === 'production' ? false : 'http://localhost:3000',
     methods: ['GET', 'POST']
   }
 });
@@ -21,6 +22,11 @@ gameService.setSocketIO(io);
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from React build in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../../../../client/build')));
+}
 
 // Initialize routes with the game service instance
 app.use('/api/games', createGameRoutes(gameService));
@@ -74,8 +80,19 @@ io.on('connection', (socket) => {
   });
 });
 
+// Serve React app for all non-API routes in production (must be after API routes)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../../../client/build/index.html'));
+  });
+}
+
 // Start server
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  if (process.env.NODE_ENV === 'production') {
+    console.log('Serving React app from /client/build');
+  }
 }); 

@@ -2,9 +2,9 @@
   "name": "number-poker-server",
   "version": "1.0.0",
   "description": "Backend server for Number Poker game",
-  "main": "dist/index.js",
+  "main": "dist/server/src/index.js",
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node dist/server/src/index.js",
     "dev": "ts-node-dev -r tsconfig-paths/register src/index.ts",
     "build": "tsc",
     "test": "jest"

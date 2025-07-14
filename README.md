@@ -166,3 +166,14 @@ The server will run on port 3001 and serve:
 - `gameUpdate` - Receive game state updates
 - `requireSwap` - Handle card swap requests
 - `error` - Handle error messages 
+
+
+## Issues Remained to be Fixed
+- Add a betting round before the first dealing phase
+- When player run out of chips, should be eliminated from the game
+- When player disconnected, should leave the game room
+- Fix the bet both function
+- Player should not be able to bet higher than lowest-chip players amount
+- Add reconnection functionality
+- When a game is started, new players should be able to join and spectate until next round starts
+

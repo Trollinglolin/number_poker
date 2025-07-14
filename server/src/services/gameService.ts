@@ -227,7 +227,7 @@ export class GameService {
     }
 
     // Allow swapCard actions regardless of current player (for card swapping during dealing)
-    if (player.id !== game.currentPlayer && game.phase !== 'equation' && action.type !== 'swapCard') {
+    if (player.id !== game.currentPlayer && game.phase !== 'equation' && action.type !== 'swapCard' && game.phase !== 'dealing1' && game.phase !== 'dealing2') {
       throw new Error('Not your turn');
     }
 
@@ -334,6 +334,27 @@ export class GameService {
           }
           this.handleSwap(game, player, action.swapCardType);
           break;
+        case 'noSwap':
+          console.log('Successfully no swapped:', {
+            playerId: player.id,
+            playerName: player.name,
+          });
+          // Reset multiply flag since player chose not to swap
+          player.hasMultiply = false;
+          // Continue with dealing and force phase check
+          this.continueDealing(game);
+          // Additional check if all players have required cards
+          if (game.phase === 'dealing1' && 
+              game.players.every(p => p.cards.filter(c => c.type === 'number').length >= 2)) {
+            game.phase = 'betting1';
+          } else if (game.phase === 'dealing2' && 
+                     game.players.every(p => p.cards.filter(c => c.type === 'number').length >= 4)) {
+            game.phase = 'betting2';
+            game.currentBet = 0;
+            game.players.forEach(p => p.bet = 0);
+          }
+          this.notifyGameUpdate(game.id);
+          break;
         default:
           throw new Error('Invalid action');
       }
@@ -426,21 +447,21 @@ export class GameService {
     const allBetsMatched = activePlayers.every(p => p.bet === game.currentBet);
     
     // For betting2, we need to check if we've completed a full round of betting
-    if (game.phase === 'betting2' && allBetsMatched) {
-      const currentPlayerIndex = game.players.findIndex(p => p.id === game.currentPlayer);
-      const lastPlayerIndex = game.players.findIndex(p => p.id === player.id);
-      const hasCompletedRound = currentPlayerIndex <= lastPlayerIndex;
+    // if (game.phase === 'betting2' && allBetsMatched) {
+    //   const currentPlayerIndex = game.players.findIndex(p => p.id === game.currentPlayer);
+    //   const lastPlayerIndex = game.players.findIndex(p => p.id === player.id);
+    //   const hasCompletedRound = currentPlayerIndex <= lastPlayerIndex;
       
-      if (hasCompletedRound) {
-        console.log('Betting2 round complete, advancing to equation phase:', {
-          phase: game.phase,
-          currentBet: game.currentBet,
-          playerBets: game.players.map(p => ({ id: p.id, bet: p.bet }))
-        });
-        this.advanceGamePhase(game);
-        return;
-      }
-    }
+    //   if (hasCompletedRound) {
+    //     console.log('Betting2 round complete, advancing to equation phase:', {
+    //       phase: game.phase,
+    //       currentBet: game.currentBet,
+    //       playerBets: game.players.map(p => ({ id: p.id, bet: p.bet }))
+    //     });
+    //     this.advanceGamePhase(game);
+    //     return;
+    //   }
+    // }
     
     // Otherwise, move to next player as normal
     this.moveToNextPlayer(game);
@@ -655,10 +676,10 @@ export class GameService {
     // Deal cards to each player until they have the target number of number cards
     for (const player of game.players) {
       // Skip players who are waiting for card swap
-      if (player.hasMultiply) {
-        console.log('Player waiting for card swap, skipping:', player.id);
-        continue;
-      }
+      // if (player.hasMultiply) {
+      //   console.log('Player waiting for card swap, skipping:', player.id);
+      //   continue;
+      // }
       
       while (player.cards.filter(c => c.type === 'number').length < targetNumberCards) {
         if (game.deck.length === 0) {

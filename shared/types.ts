@@ -57,7 +57,7 @@ export interface GameState {
 }
 
 export type GameAction = {
-  type: 'bet' | 'fold' | 'call' | 'raise' | 'selectBetType' | 'submitEquation' | 'continue' | 'swapCard';
+  type: 'bet' | 'fold' | 'call' | 'raise' | 'selectBetType' | 'submitEquation' | 'continue' | 'swapCard' | 'noSwap';
   playerId: string;
   amount?: number;
   betType?: 'small' | 'big' | 'both';

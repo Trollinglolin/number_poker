@@ -249,6 +249,31 @@ export const GameTable: React.FC = () => {
   const handleCardSwap = (swapCardType: OperationType) => {
     if (!swapRequest) return;
     
+    if (swapCardType === "multiply"){
+      try{
+        performAction({type: 'noSwap', playerId: swapRequest.playerId});
+        setSwapRequest(null);
+        
+        // Notify the player that they didn't swap
+        toast({
+          title: 'Player Didn\'t Swap',
+          description: `Player Decided to not swap the multiply card`,
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } catch (error) {
+        console.error('Error handling no swap:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to handle no swap action',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+      return;
+    }
     try {
       performAction({
         type: 'swapCard',
@@ -673,7 +698,7 @@ export const GameTable: React.FC = () => {
             <VStack spacing={4}>
               <Text>You received a multiply card! Choose which operation card you want to swap:</Text>
               <HStack spacing={4} wrap="wrap">
-                {swapRequest?.availableCards.map((cardType) => (
+                {swapRequest?.availableCards.filter(cardType => cardType === 'add' || cardType === 'subtract').map((cardType) => (
                   <Button
                     key={cardType}
                     colorScheme="blue"
@@ -687,6 +712,13 @@ export const GameTable: React.FC = () => {
                      cardType === 'squareRoot' ? '√' : cardType}
                   </Button>
                 ))}
+                <Button
+                  colorScheme="red"
+                  size="lg"
+                  onClick={() => handleCardSwap("multiply")}
+                >
+                  Cancel
+                </Button>
               </HStack>
             </VStack>
           </ModalBody>

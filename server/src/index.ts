@@ -77,6 +77,8 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
+    // Handle player disconnection
+    gameService.handlePlayerDisconnect(socket.id);
   });
 });
 

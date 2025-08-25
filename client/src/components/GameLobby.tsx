@@ -19,7 +19,38 @@ export const GameLobby: React.FC = () => {
   const [gameId, setGameId] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const toast = useToast();
+
+  // Check for stored session on component mount
+  React.useEffect(() => {
+    const storedSession = localStorage.getItem('numberPokerSession');
+    if (storedSession) {
+      try {
+        const session = JSON.parse(storedSession);
+        setPlayerName(session.playerName || '');
+        setGameId(session.gameId || '');
+      } catch (err) {
+        console.error('Error parsing stored session:', err);
+        localStorage.removeItem('numberPokerSession');
+      }
+    }
+  }, []);
+
+  // Store session when joining a game
+  const storeSession = (playerName: string, gameId: string, playerId: string) => {
+    localStorage.setItem('numberPokerSession', JSON.stringify({
+      playerName,
+      gameId,
+      playerId,
+      timestamp: Date.now()
+    }));
+  };
+
+  // Clear stored session
+  const clearSession = () => {
+    localStorage.removeItem('numberPokerSession');
+  };
 
   const handleCreateGame = useCallback(async () => {
     if (!playerName.trim()) {
@@ -74,7 +105,10 @@ export const GameLobby: React.FC = () => {
 
     try {
       setIsJoining(true);
-      await joinGame(gameId, playerName);
+      const playerId = await joinGame(gameId, playerName);
+      if (playerId) {
+        storeSession(playerName, gameId, playerId);
+      }
     } catch (err) {
       // Error is already handled in the context
       // Just reset the joining state
@@ -82,6 +116,45 @@ export const GameLobby: React.FC = () => {
       setIsJoining(false);
     }
   }, [playerName, gameId, joinGame, toast, isJoining, isCreating]);
+
+  const handleReconnect = useCallback(async () => {
+    const storedSession = localStorage.getItem('numberPokerSession');
+    if (!storedSession) return;
+
+    try {
+      const session = JSON.parse(storedSession);
+      if (!session.playerName || !session.gameId || !session.playerId) return;
+
+      // Check if session is not too old (24 hours)
+      const sessionAge = Date.now() - session.timestamp;
+      if (sessionAge > 24 * 60 * 60 * 1000) {
+        clearSession();
+        return;
+      }
+
+      setIsReconnecting(true);
+      await joinGame(session.gameId, session.playerName, session.playerId);
+      toast({
+        title: 'Reconnected!',
+        description: 'Successfully reconnected to your previous game',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err) {
+      console.error('Reconnection failed:', err);
+      clearSession();
+      toast({
+        title: 'Reconnection Failed',
+        description: 'Could not reconnect to previous game. Please join manually.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsReconnecting(false);
+    }
+  }, [joinGame, toast]);
 
   return (
     <Container maxW="container.md" py={10}>
@@ -140,6 +213,19 @@ export const GameLobby: React.FC = () => {
             >
               Join Game
             </Button>
+
+            {/* Reconnection button */}
+            {localStorage.getItem('numberPokerSession') && (
+              <Button
+                colorScheme="orange"
+                width="full"
+                onClick={handleReconnect}
+                isDisabled={isJoining || isCreating || isReconnecting}
+                isLoading={isReconnecting}
+              >
+                Reconnect to Previous Game
+              </Button>
+            )}
           </VStack>
         </Box>
       </VStack>

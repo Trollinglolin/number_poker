@@ -124,9 +124,9 @@ const PlayerHand: React.FC<{
     ? operationCards 
     : operationCards;
 
-  // Only show betting actions during betting phases
-  const isBettingPhase = gamePhase.startsWith('betting');
-  const canShowActions = showActions && isBettingPhase && !player.isFolded;
+  // Only show betting actions during betting phases or preflop
+  const isBettingPhase = gamePhase.startsWith('betting') || gamePhase === 'preflop';
+  const canShowActions = showActions && isBettingPhase && !player.isFolded && player.isActive;
 
   const handleBet = () => {
     const amount = parseInt(betAmount);
@@ -514,7 +514,7 @@ export const GameTable: React.FC = () => {
               <Spacer />
               <Text>Current Bet: {game.currentBet} chips</Text>
               <Spacer />
-              <Badge colorScheme="purple">Phase: {game.phase}</Badge>
+              <Badge colorScheme="purple">Phase: {game.phase === 'preflop' ? 'Preflop Betting' : game.phase}</Badge>
             </Flex>
             {activePlayer && (
               <Text fontWeight="bold" color={activePlayer.id === playerId ? "blue.500" : "gray.700"}>
@@ -554,8 +554,9 @@ export const GameTable: React.FC = () => {
           <Box w="100%" p={4} borderWidth={1} borderRadius="md" bg="blue.50">
             <VStack spacing={4} as={Stack} {...({ spacing: 4 } as ExtendedStackProps)}>
               <Text fontSize="lg" fontWeight="bold">Equation Phase</Text>
-              <Text>Create your equation to get as close as possible to 1 or 20</Text>
-              {/* If betType not selected, show bet type buttons */}
+              <Text>Create your equation(s) to get as close as possible to 1 or 20</Text>
+              
+              {/* Show bet type selection if not yet selected */}
               {!currentPlayer.betType && (
                 <HStack spacing={4}>
                   <Button
@@ -581,7 +582,8 @@ export const GameTable: React.FC = () => {
                   </Button>
                 </HStack>
               )}
-              {/* If betType selected and not yet submitted, show equation builder */}
+              
+              {/* Show equation builder based on bet type */}
               {currentPlayer.betType && !currentPlayer.submittedEquations && (
                 <EquationBuilder
                   betType={currentPlayer.betType}
@@ -590,6 +592,7 @@ export const GameTable: React.FC = () => {
                   onSubmit={equations => handleAction({ type: 'submitEquation', playerId: currentPlayer.id, equations })}
                 />
               )}
+              
               {/* If already submitted, show a message */}
               {currentPlayer.betType && currentPlayer.submittedEquations && (
                 <Text color="green.600" fontWeight="bold">Equations submitted! Waiting for other players...</Text>

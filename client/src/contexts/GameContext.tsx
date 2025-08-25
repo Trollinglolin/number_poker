@@ -10,7 +10,7 @@ interface GameContextType {
   gameId: string | null;
   error: string | null;
   createGame: () => Promise<string>;
-  joinGame: (gameId: string, playerName: string) => Promise<void>;
+  joinGame: (gameId: string, playerName: string, existingPlayerId?: string) => Promise<string>;
   startGame: () => Promise<void>;
   performAction: (action: GameAction) => void;
   socket: Socket | null;
@@ -254,7 +254,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const joinGame = async (gameId: string, playerName: string) => {
+  const joinGame = async (gameId: string, playerName: string, existingPlayerId?: string) => {
     // Validate gameId is a string
     if (typeof gameId !== 'string') {
       console.error('Invalid game ID type:', typeof gameId);
@@ -262,7 +262,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Check if we're already in this game
-    if (lastJoinedGame.current === gameId) {
+    if (lastJoinedGame.current === gameId && !existingPlayerId) {
       console.log('Already joined this game:', gameId);
       return;
     }
@@ -275,7 +275,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       joinInProgress.current = true;
-      console.log('Attempting to join game:', { gameId, playerName });
+      console.log('Attempting to join game:', { gameId, playerName, existingPlayerId });
       
       // Only validate game ID format if we're joining an existing game
       // (not when creating a new game)
@@ -300,7 +300,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? window.location.origin 
         : 'http://localhost:3001';
       const response = await axios.post(`${baseUrl}/api/games/${gameId}/join`, {
-        playerName
+        playerName,
+        playerId: existingPlayerId
       });
       
       console.log('Join game response:', response.data);
@@ -338,6 +339,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('Socket not ready, queuing game join');
         pendingGameJoin.current = { gameId, playerId: newPlayerId };
       }
+
+      return newPlayerId;
     } catch (err) {
       console.error('Error joining game:', err);
       let errorMessage = 'Failed to join game';

@@ -36,7 +36,7 @@ export interface GameState {
   currentPlayer: string;
   pot: number;
   currentBet: number;
-  phase: 'waiting' | 'dealing1' | 'betting1' | 'dealing2' | 'betting2' | 'equation' | 'final' | 'ended';
+  phase: 'waiting' | 'preflop' | 'dealing1' | 'betting1' | 'dealing2' | 'betting2' | 'equation' | 'final' | 'ended';
   round: number;
   winners: {
     small: string[];

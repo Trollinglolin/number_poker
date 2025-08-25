@@ -38,19 +38,52 @@ export class GameService {
     return this.games.get(gameId);
   }
 
-  joinGame(gameId: string, playerName: string): string {
+  joinGame(gameId: string, playerName: string, playerId?: string): string {
     const game = this.games.get(gameId);
     if (!game) {
       throw new Error('Game not found');
+    }
+
+    // Check if this is a reconnection attempt
+    if (playerId) {
+      const existingPlayer = game.players.find(p => p.id === playerId && p.name === playerName);
+      if (existingPlayer) {
+        console.log('Player reconnecting:', { gameId, playerId, playerName });
+        existingPlayer.isActive = true;
+        this.notifyGameUpdate(gameId);
+        return playerId;
+      }
+    }
+
+    // Check if game allows new players to join
+    if (game.phase !== 'waiting' && game.phase !== 'ended') {
+      // Allow spectators to join ongoing games
+      const spectatorId = uuidv4();
+      const spectator: Player = {
+        id: spectatorId,
+        name: playerName + ' (Spectator)',
+        chips: 0,
+        cards: [],
+        operationCards: [],
+        bet: 0,
+        betType: null,
+        isActive: false,
+        isFolded: true,
+        isSquareRoot: false,
+        hasMultiply: false
+      };
+      game.players.push(spectator);
+      this.notifyGameUpdate(gameId);
+      return spectatorId;
     }
 
     if (game.phase !== 'waiting') {
       throw new Error('Game has already started');
     }
 
-    const playerId = uuidv4();
+    const newPlayerId = uuidv4();
     const player: Player = {
-      id: playerId,
+      id: newPlayerId,
       name: playerName,
       chips: 1000,
       cards: [],
@@ -69,7 +102,7 @@ export class GameService {
 
     game.players.push(player);
     this.notifyGameUpdate(gameId);
-    return playerId;
+    return newPlayerId;
   }
 
   startGame(gameId: string): void {
@@ -102,7 +135,7 @@ export class GameService {
 
     // Reset game state while preserving chips
     game.deck = this.createDeck();
-    game.phase = 'dealing1'; // Start with dealing1 phase
+    game.phase = 'preflop'; // Start with preflop betting phase
     game.currentPlayer = game.players[0].id;
     game.currentBet = 0;
     game.pot = 0;
@@ -127,7 +160,6 @@ export class GameService {
       player.chips = currentChips; // Restore chips
     });
 
-    this.dealInitialCards(game);
     this.notifyGameUpdate(game.id);
   }
 
@@ -195,9 +227,9 @@ export class GameService {
             equations
           });
         }
-      } else if (game.phase.startsWith('betting')) {
+      } else if (game.phase.startsWith('betting') || game.phase === 'preflop') {
         // Existing betting phase logic
-        const activePlayers = game.players.filter(p => !p.isFolded);
+        const activePlayers = game.players.filter(p => !p.isFolded && p.isActive);
         const currentBet = game.currentBet;
         const botBet = bot.bet;
         const callAmount = currentBet - botBet;
@@ -240,7 +272,7 @@ export class GameService {
     });
 
     // Check if the action is allowed in the current phase
-    const isBettingPhase = game.phase.startsWith('betting');
+    const isBettingPhase = game.phase.startsWith('betting') || game.phase === 'preflop';
     const isEquationPhase = game.phase === 'equation';
     const isDealingPhase = game.phase === 'dealing1' || game.phase === 'dealing2' || game.players.some(p => p.hasMultiply);
 
@@ -307,25 +339,43 @@ export class GameService {
           if (!isEquationPhase) {
             throw new Error('Equation submission is only allowed during equation phase');
           }
-          if (!action.equations || (player.betType === 'both' && (!action.equations.small || !action.equations.big)) || (player.betType === 'small' && !action.equations.small) || (player.betType === 'big' && !action.equations.big)) {
-            throw new Error('All required equations must be submitted');
+          if (!action.equations) {
+            throw new Error('Equations are required');
           }
+          
+          // Validate equations based on bet type
+          if (player.betType === 'both') {
+            if (!action.equations.small || !action.equations.big) {
+              throw new Error('Both small and big equations are required when betting both');
+            }
+          } else if (player.betType === 'small') {
+            if (!action.equations.small) {
+              throw new Error('Small equation is required when betting small');
+            }
+          } else if (player.betType === 'big') {
+            if (!action.equations.big) {
+              throw new Error('Big equation is required when betting big');
+            }
+          } else {
+            throw new Error('Bet type must be selected before submitting equations');
+          }
+          
           player.submittedEquations = action.equations;
+          
           // Check if all active (not folded) players have submitted all required equations
           const allSubmitted = game.players.every(p => {
-            if (p.isFolded) return true;
+            if (p.isFolded || !p.isActive) return true;
             if (p.betType === 'both') return p.submittedEquations?.small && p.submittedEquations?.big;
             if (p.betType === 'small') return p.submittedEquations?.small;
             if (p.betType === 'big') return p.submittedEquations?.big;
             return false;
           });
+          
           if (allSubmitted) {
             this.resolveEquationsAndDistributePot(game);
             this.advanceGamePhase(game);
-          } else {
-            // this.moveToNextPlayer(game);
-            // this.notifyGameUpdate(game.id);
           }
+          
           this.notifyGameUpdate(game.id);
           break;
         case 'swapCard':
@@ -386,6 +436,13 @@ export class GameService {
       throw new Error('Not enough chips');
     }
 
+    // Check if bet would exceed the lowest chip player's amount
+    const activePlayers = game.players.filter(p => !p.isFolded);
+    const lowestChips = Math.min(...activePlayers.map(p => p.chips));
+    if (amount > lowestChips) {
+      throw new Error(`Cannot bet more than the lowest chip player's amount (${lowestChips})`);
+    }
+
     // Update player's chips and bet
     player.chips -= amount;
     player.bet += amount;
@@ -399,9 +456,35 @@ export class GameService {
       currentBet: game.currentBet 
     });
 
+    // Check if player is eliminated
+    this.checkPlayerElimination(game, player);
+
     // Move to next player and notify immediately
     this.moveToNextPlayer(game);
     this.notifyGameUpdate(game.id);
+  }
+
+  private checkPlayerElimination(game: GameState, player: Player): void {
+    if (player.chips <= 0) {
+      console.log('Player eliminated due to no chips:', player.id);
+      player.isFolded = true;
+      player.isActive = false;
+      
+      // Check if only one player remains
+      const activePlayers = game.players.filter(p => !p.isFolded && p.isActive);
+      if (activePlayers.length <= 1) {
+        // Last player wins
+        const winner = activePlayers[0];
+        if (winner) {
+          console.log('Last player remaining, winner:', winner.id);
+          game.winners.small = [winner.id];
+          game.winners.big = [winner.id];
+          winner.chips += game.pot;
+          game.phase = 'ended';
+          this.notifyGameUpdate(game.id);
+        }
+      }
+    }
   }
 
   private handleCall(game: GameState, player: Player): void {
@@ -429,6 +512,9 @@ export class GameService {
       phase: game.phase
     });
 
+    // Check if player is eliminated
+    this.checkPlayerElimination(game, player);
+
     // Check if this is single player mode (one human player and one bot)
     const isSinglePlayerMode = game.players.length === 2 && 
       game.players.some(p => p.id.startsWith('bot-')) && 
@@ -451,7 +537,7 @@ export class GameService {
     //   const currentPlayerIndex = game.players.findIndex(p => p.id === game.currentPlayer);
     //   const lastPlayerIndex = game.players.findIndex(p => p.id === player.id);
     //   const hasCompletedRound = currentPlayerIndex <= lastPlayerIndex;
-      
+    //   
     //   if (hasCompletedRound) {
     //     console.log('Betting2 round complete, advancing to equation phase:', {
     //       phase: game.phase,
@@ -577,9 +663,9 @@ export class GameService {
     const currentPlayerIndex = game.players.findIndex(p => p.id === game.currentPlayer);
     if (currentPlayerIndex === -1) return;
 
-    // Find the next active player
+    // Find the next active player (not folded and active)
     let nextPlayerIndex = (currentPlayerIndex + 1) % game.players.length;
-    while (game.players[nextPlayerIndex].isFolded) {
+    while (game.players[nextPlayerIndex].isFolded || !game.players[nextPlayerIndex].isActive) {
       nextPlayerIndex = (nextPlayerIndex + 1) % game.players.length;
     }
 
@@ -588,11 +674,19 @@ export class GameService {
 
     // If we've completed a round, check if all active players have matched the current bet
     if (hasCompletedRound) {
-      const activePlayers = game.players.filter(p => !p.isFolded);
+      const activePlayers = game.players.filter(p => !p.isFolded && p.isActive);
       const allBetsMatched = activePlayers.every(p => p.bet === game.currentBet);
 
       if (allBetsMatched) {
-        if (game.phase === 'betting1') {
+        if (game.phase === 'preflop') {
+          console.log('Preflop round complete, advancing to dealing1 phase:', {
+            phase: game.phase,
+            currentBet: game.currentBet,
+            playerBets: game.players.map(p => ({ id: p.id, bet: p.bet }))
+          });
+          this.advanceGamePhase(game);
+          return;
+        } else if (game.phase === 'betting1') {
           console.log('Betting1 round complete, advancing to next phase:', {
             phase: game.phase,
             currentBet: game.currentBet,
@@ -628,7 +722,12 @@ export class GameService {
     });
 
     // Reset current bet and player bets at the start of new betting rounds
-    if (game.phase === 'betting1') {
+    if (game.phase === 'preflop') {
+      // After preflop betting round, move to dealing1 phase
+      game.phase = 'dealing1';
+      // Deal initial 2 cards to each player
+      this.dealCards(game, 2, true);
+    } else if (game.phase === 'betting1') {
       // After first betting round, move to dealing2 phase
       game.phase = 'dealing2';
       // Deal additional cards (total of 4)
@@ -658,17 +757,7 @@ export class GameService {
     this.resolveEquationsAndDistributePot(game); 
   }
 
-  private dealInitialCards(game: GameState): void {
-    // Deal initial 2 number cards to each player
-    this.dealCards(game, 2, true); // true indicates we want exactly 2 number cards
-    // After dealing initial cards, automatically advance to betting1
-    // But only if no players are waiting for card swap
-    const waitingForSwap = game.players.some(p => p.hasMultiply);
-    if (!waitingForSwap) {
-      game.phase = 'betting1';
-      this.notifyGameUpdate(game.id);
-    }
-  }
+
 
   private dealCards(game: GameState, targetNumberCards: number, requireExactNumberCards: boolean = false): void {
     console.log('Dealing cards:', { targetNumberCards, phase: game.phase, requireExactNumberCards });
@@ -860,6 +949,40 @@ export class GameService {
     }
 
     return deck;
+  }
+
+  handlePlayerDisconnect(socketId: string): void {
+    // Find the game that contains the disconnected player
+    for (const [gameId, game] of this.games) {
+      const disconnectedPlayer = game.players.find(p => p.id === socketId);
+      if (disconnectedPlayer) {
+        console.log('Player disconnected from game:', { gameId, playerId: socketId, playerName: disconnectedPlayer.name });
+        
+        // Mark player as inactive but don't remove them immediately
+        disconnectedPlayer.isActive = false;
+        
+        // If it's the current player's turn, move to next player
+        if (game.currentPlayer === socketId) {
+          this.moveToNextPlayer(game);
+        }
+        
+        // Check if enough players remain to continue
+        const activePlayers = game.players.filter(p => p.isActive && !p.isFolded);
+        if (activePlayers.length <= 1 && game.phase !== 'waiting') {
+          // End the game if not enough players
+          const winner = activePlayers[0];
+          if (winner) {
+            game.winners.small = [winner.id];
+            game.winners.big = [winner.id];
+            winner.chips += game.pot;
+          }
+          game.phase = 'ended';
+        }
+        
+        this.notifyGameUpdate(gameId);
+        break;
+      }
+    }
   }
 
   private notifyGameUpdate(gameId: string): void {
@@ -1055,7 +1178,21 @@ export class GameService {
     // Store equation results in game state for client display
     game.equationResults = equationResults;
 
-    // Distribute pot with tiebreaker support
+    // Check for "bet both" players who lost either small or big
+    const bothBetPlayers = results.filter(r => r.player.betType === 'both');
+    const bothBetLosers: Player[] = [];
+    
+    for (const bothPlayer of bothBetPlayers) {
+      const lostSmall = typeof bothPlayer.small === 'number' && smallWinner && smallWinner.id !== bothPlayer.player.id;
+      const lostBig = typeof bothPlayer.big === 'number' && bigWinner && bigWinner.id !== bothPlayer.player.id;
+      
+      // If player bet both but lost either small or big, they lose completely
+      if (lostSmall || lostBig) {
+        bothBetLosers.push(bothPlayer.player);
+      }
+    }
+
+    // Distribute pot with new "bet both" rule
     if (allSmall && smallWinner) {
       // All players bet small - single winner takes full pot
       smallWinner.chips += game.pot;
@@ -1070,14 +1207,28 @@ export class GameService {
       game.winners.small = [smallWinner.id];
       game.winners.big = [bigWinner.id];
     } else {
-      // Split pot (tiebreakers already applied)
-      if (smallWinner) {
-        smallWinner.chips += Math.floor(game.pot / 2);
-        game.winners.small = [smallWinner.id];
-      }
-      if (bigWinner) {
-        bigWinner.chips += Math.ceil(game.pot / 2);
-        game.winners.big = [bigWinner.id];
+      // Handle mixed betting scenarios with new "bet both" rule
+      const hasBothBetLosers = bothBetLosers.length > 0;
+      
+      if (hasBothBetLosers) {
+        // If there are "bet both" losers, the other winners take the entire pot
+        if (smallWinner && !bothBetLosers.some(p => p.id === smallWinner.id)) {
+          smallWinner.chips += game.pot;
+          game.winners.small = [smallWinner.id];
+        } else if (bigWinner && !bothBetLosers.some(p => p.id === bigWinner.id)) {
+          bigWinner.chips += game.pot;
+          game.winners.big = [bigWinner.id];
+        }
+      } else {
+        // No "bet both" losers, split pot as before (tiebreakers already applied)
+        if (smallWinner) {
+          smallWinner.chips += Math.floor(game.pot / 2);
+          game.winners.small = [smallWinner.id];
+        }
+        if (bigWinner) {
+          bigWinner.chips += Math.ceil(game.pot / 2);
+          game.winners.big = [bigWinner.id];
+        }
       }
     }
 

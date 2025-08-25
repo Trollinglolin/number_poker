@@ -42,16 +42,16 @@ export default function createGameRoutes(gameService: GameService) {
   router.post('/:gameId/join', (req: Request, res: Response) => {
     try {
       const { gameId } = req.params;
-      const { playerName } = req.body;
+      const { playerName, playerId } = req.body;
 
       if (!playerName) {
         throw new Error('Player name is required');
       }
 
-      console.log('Player joining game:', { gameId, playerName });
-      const playerId = gameService.joinGame(gameId, playerName);
-      console.log('Player joined successfully:', playerId);
-      res.json({ playerId });
+      console.log('Player joining game:', { gameId, playerName, playerId });
+      const newPlayerId = gameService.joinGame(gameId, playerName, playerId);
+      console.log('Player joined successfully:', newPlayerId);
+      res.json({ playerId: newPlayerId });
     } catch (error) {
       console.error('Error joining game:', error);
       res.status(500).json({ 

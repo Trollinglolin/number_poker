@@ -221,6 +221,8 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
   const [smallSlots, setSmallSlots] = useState<CardSlot[]>([]);
   const [bigSlots, setBigSlots] = useState<CardSlot[]>([]);
   const [availableCards, setAvailableCards] = useState<GameCard[]>([...cards, ...operationCards]);
+  const [availableCardsSmall, setAvailableCardsSmall] = useState<GameCard[]>([...cards, ...operationCards]);
+  const [availableCardsBig, setAvailableCardsBig] = useState<GameCard[]>([...cards, ...operationCards]);
   const toast = useToast();
 
   const sensors = useSensors(
@@ -253,7 +255,16 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
     if (betType === 'big' || betType === 'both') {
       setBigSlots(emptySlots.map(slot => ({ ...slot, id: `big-${slot.id}` })));
     }
-  }, [betType, cards.length, operationCards.length]);
+
+    // Initialize available cards based on bet type
+    const allCards = [...cards, ...operationCards];
+    if (betType === 'both') {
+      setAvailableCardsSmall([...allCards]);
+      setAvailableCardsBig([...allCards]);
+    } else {
+      setAvailableCards([...allCards]);
+    }
+  }, [betType, cards, operationCards]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -262,46 +273,91 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Only handle dragging from available cards to equation slots
-    if (activeId.startsWith('card-')) {
-      const cardIndex = parseInt(activeId.split('-')[1]);
-      const card = availableCards[cardIndex];
-      
-      // Only allow dropping into equation slots
-      if (overId === 'available-cards') {
-        return;
+    if (betType === 'both') {
+      // Handle drag for bet both with separate card pools
+      if (activeId.startsWith('card-small-')) {
+        const cardIndex = parseInt(activeId.split('-')[2]);
+        const card = availableCardsSmall[cardIndex];
+        
+        if (overId.startsWith('small-')) {
+          // Remove card from small available cards
+          const newAvailableCardsSmall = [...availableCardsSmall];
+          newAvailableCardsSmall.splice(cardIndex, 1);
+          setAvailableCardsSmall(newAvailableCardsSmall);
+
+          // Add card to small equation slot
+          const slotIndex = parseInt(overId.split('-')[2]);
+          if (smallSlots[slotIndex].card) {
+            setAvailableCardsSmall(prev => [...prev, smallSlots[slotIndex].card!]);
+          }
+          
+          const newSlots = [...smallSlots];
+          newSlots[slotIndex] = { ...newSlots[slotIndex], card };
+          setSmallSlots(newSlots);
+        }
+      } else if (activeId.startsWith('card-big-')) {
+        const cardIndex = parseInt(activeId.split('-')[2]);
+        const card = availableCardsBig[cardIndex];
+        
+        if (overId.startsWith('big-')) {
+          // Remove card from big available cards
+          const newAvailableCardsBig = [...availableCardsBig];
+          newAvailableCardsBig.splice(cardIndex, 1);
+          setAvailableCardsBig(newAvailableCardsBig);
+
+          // Add card to big equation slot
+          const slotIndex = parseInt(overId.split('-')[2]);
+          if (bigSlots[slotIndex].card) {
+            setAvailableCardsBig(prev => [...prev, bigSlots[slotIndex].card!]);
+          }
+          
+          const newSlots = [...bigSlots];
+          newSlots[slotIndex] = { ...newSlots[slotIndex], card };
+          setBigSlots(newSlots);
+        }
       }
+    } else {
+      // Handle drag for single bet types
+      if (activeId.startsWith('card-')) {
+        const cardIndex = parseInt(activeId.split('-')[1]);
+        const card = availableCards[cardIndex];
+        
+        // Only allow dropping into equation slots
+        if (overId === 'available-cards') {
+          return;
+        }
 
-      // Determine which equation slot we're dropping into
-      let targetSlots: CardSlot[];
-      let setTargetSlots: React.Dispatch<React.SetStateAction<CardSlot[]>>;
-      
-      if (overId.startsWith('small-')) {
-        targetSlots = smallSlots;
-        setTargetSlots = setSmallSlots;
-      } else if (overId.startsWith('big-')) {
-        targetSlots = bigSlots;
-        setTargetSlots = setBigSlots;
-      } else {
-        return; // Not dropping into a valid slot
+        // Determine which equation slot we're dropping into
+        let targetSlots: CardSlot[];
+        let setTargetSlots: React.Dispatch<React.SetStateAction<CardSlot[]>>;
+        
+        if (overId.startsWith('small-')) {
+          targetSlots = smallSlots;
+          setTargetSlots = setSmallSlots;
+        } else if (overId.startsWith('big-')) {
+          targetSlots = bigSlots;
+          setTargetSlots = setBigSlots;
+        } else {
+          return; // Not dropping into a valid slot
+        }
+
+        // Remove card from available cards
+        const newAvailableCards = [...availableCards];
+        newAvailableCards.splice(cardIndex, 1);
+        setAvailableCards(newAvailableCards);
+
+        // Add card to target slot
+        const slotIndex = parseInt(overId.split('-')[2]);
+
+        if (targetSlots[slotIndex].card) {
+          // If slot already has a card, add it back to available cards
+          setAvailableCards(prev => [...prev, targetSlots[slotIndex].card!]);
+        }
+        
+        const newSlots = [...targetSlots];
+        newSlots[slotIndex] = { ...newSlots[slotIndex], card };
+        setTargetSlots(newSlots);
       }
-
-      // Remove card from available cards
-      const newAvailableCards = [...availableCards];
-      newAvailableCards.splice(cardIndex, 1);
-      setAvailableCards(newAvailableCards);
-
-      // Add card to target slot
-      const slotIndex = parseInt(overId.split('-')[2]);
-
-      if (targetSlots[slotIndex].card) {
-      // If slot already has a card, add it back to available cards
-      setAvailableCards(prev => [...prev, targetSlots[slotIndex].card!]);
-      }
-      
-      const newSlots = [...targetSlots];
-      newSlots[slotIndex] = { ...newSlots[slotIndex], card };
-      setTargetSlots(newSlots);
     }
   };
 
@@ -314,8 +370,17 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
     const card = slots[slotIndex].card;
 
     if (card) {
-      // Add card back to available cards
-      setAvailableCards([...availableCards, card]);
+      if (betType === 'both') {
+        // Add card back to the appropriate available cards pool
+        if (isSmall) {
+          setAvailableCardsSmall([...availableCardsSmall, card]);
+        } else {
+          setAvailableCardsBig([...availableCardsBig, card]);
+        }
+      } else {
+        // Add card back to available cards
+        setAvailableCards([...availableCards, card]);
+      }
       
       // Remove card from slot
       const newSlots = [...slots];
@@ -404,68 +469,93 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
       onDragEnd={handleDragEnd}
     >
       <VStack spacing={6} align="stretch" w="100%">
-        {/* Available Cards */}
-        <Box>
-          <Text fontWeight="bold" mb={2}>Available Cards</Text>
-          <Box
-            id="available-cards"
-            p={2}
-            bg="gray.50"
-            borderRadius="md"
-            minH="100px"
-            border="2px dashed"
-            borderColor="gray.300"
-          >
-            <HStack spacing={2}>
-              <SortableContext
-                items={availableCards.map((_, index) => `card-${index}`)}
-                strategy={horizontalListSortingStrategy}
+        {/* For bet both, show separate available cards for each equation */}
+        {betType === 'both' ? (
+          <HStack spacing={8} align="start" w="100%">
+            {/* Small Equation with its own available cards */}
+            <Box flex={1}>
+              <Text fontWeight="bold" mb={2} color="blue.600">Available Cards (Small)</Text>
+              <Box
+                id="available-cards-small"
+                p={2}
+                bg="gray.50"
+                borderRadius="md"
+                minH="100px"
+                border="2px dashed"
+                borderColor="gray.300"
               >
-                {availableCards.map((card, index) => (
-                  <SortableCard
-                    key={`card-${index}`}
-                    id={`card-${index}`}
-                    card={card}
-                    index={index}
-                  />
-                ))}
-              </SortableContext>
-            </HStack>
-          </Box>
-        </Box>
+                <HStack spacing={2}>
+                  <SortableContext
+                    items={availableCardsSmall.map((_, index) => `card-small-${index}`)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {availableCardsSmall.map((card, index) => (
+                      <SortableCard
+                        key={`card-small-${index}`}
+                        id={`card-small-${index}`}
+                        card={card}
+                        index={index}
+                      />
+                    ))}
+                  </SortableContext>
+                </HStack>
+              </Box>
+            </Box>
 
-        {/* Small Equation */}
-        {(betType === 'small' || betType === 'both') && (
+            {/* Big Equation with its own available cards */}
+            <Box flex={1}>
+              <Text fontWeight="bold" mb={2} color="red.600">Available Cards (Big)</Text>
+              <Box
+                id="available-cards-big"
+                p={2}
+                bg="gray.50"
+                borderRadius="md"
+                minH="100px"
+                border="2px dashed"
+                borderColor="gray.300"
+              >
+                <HStack spacing={2}>
+                  <SortableContext
+                    items={availableCardsBig.map((_, index) => `card-big-${index}`)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {availableCardsBig.map((card, index) => (
+                      <SortableCard
+                        key={`card-big-${index}`}
+                        id={`card-big-${index}`}
+                        card={card}
+                        index={index}
+                      />
+                    ))}
+                  </SortableContext>
+                </HStack>
+              </Box>
+            </Box>
+          </HStack>
+        ) : (
+          /* For single bet types, show single available cards section */
           <Box>
-            <HStack justify="space-between" mb={2}>
-              <Text fontWeight="bold">Small Equation (Target: 1)</Text>
-              {smallEquationResult !== null && (
-                <Text
-                  color={Math.abs(smallEquationResult - 1) < 0.0001 ? 'green.500' : 'red.500'}
-                  fontWeight="bold"
-                >
-                  Result: {smallEquationResult.toFixed(4)}
-                </Text>
-              )}
-            </HStack>
+            <Text fontWeight="bold" mb={2}>Available Cards</Text>
             <Box
+              id="available-cards"
               p={2}
-              bg="blue.50"
+              bg="gray.50"
               borderRadius="md"
               minH="100px"
+              border="2px dashed"
+              borderColor="gray.300"
             >
               <HStack spacing={2}>
                 <SortableContext
-                  items={smallSlots.map(slot => slot.id)}
+                  items={availableCards.map((_, index) => `card-${index}`)}
                   strategy={horizontalListSortingStrategy}
                 >
-                  {smallSlots.map((slot, index) => (
+                  {availableCards.map((card, index) => (
                     <SortableCard
-                      key={slot.id}
-                      id={slot.id}
-                      card={slot.card}
+                      key={`card-${index}`}
+                      id={`card-${index}`}
+                      card={card}
                       index={index}
-                      onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
                     />
                   ))}
                 </SortableContext>
@@ -474,50 +564,174 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
           </Box>
         )}
 
-        {/* Big Equation */}
-        {(betType === 'big' || betType === 'both') && (
-          <Box>
-            <HStack justify="space-between" mb={2}>
-              <Text fontWeight="bold">Big Equation (Target: 20)</Text>
-              {bigEquationResult !== null && (
-                <Text
-                  color={Math.abs(bigEquationResult - 20) < 0.0001 ? 'green.500' : 'red.500'}
-                  fontWeight="bold"
-                >
-                  Result: {bigEquationResult.toFixed(4)}
-                </Text>
-              )}
-            </HStack>
-            <Box
-              p={2}
-              bg="red.50"
-              borderRadius="md"
-              minH="100px"
-            >
-              <HStack spacing={2}>
-                <SortableContext
-                  items={bigSlots.map(slot => slot.id)}
-                  strategy={horizontalListSortingStrategy}
-                >
-                  {bigSlots.map((slot, index) => (
-                    <SortableCard
-                      key={slot.id}
-                      id={slot.id}
-                      card={slot.card}
-                      index={index}
-                      onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
-                    />
-                  ))}
-                </SortableContext>
+        {/* For bet both, show both equations side by side */}
+        {betType === 'both' ? (
+          <HStack spacing={8} align="start" w="100%">
+            {/* Small Equation */}
+            <Box flex={1}>
+              <HStack justify="space-between" mb={2}>
+                <Text fontWeight="bold" color="blue.600">Small Equation (Target: 1)</Text>
+                {smallEquationResult !== null && (
+                  <Text
+                    color={Math.abs(smallEquationResult - 1) < 0.0001 ? 'green.500' : 'red.500'}
+                    fontWeight="bold"
+                  >
+                    Result: {smallEquationResult.toFixed(4)}
+                  </Text>
+                )}
               </HStack>
+              <Box
+                p={2}
+                bg="blue.50"
+                borderRadius="md"
+                minH="100px"
+              >
+                <HStack spacing={2}>
+                  <SortableContext
+                    items={smallSlots.map(slot => slot.id)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {smallSlots.map((slot, index) => (
+                      <SortableCard
+                        key={slot.id}
+                        id={slot.id}
+                        card={slot.card}
+                        index={index}
+                        onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
+                      />
+                    ))}
+                  </SortableContext>
+                </HStack>
+              </Box>
             </Box>
-          </Box>
+
+            {/* Big Equation */}
+            <Box flex={1}>
+              <HStack justify="space-between" mb={2}>
+                <Text fontWeight="bold" color="red.600">Big Equation (Target: 20)</Text>
+                {bigEquationResult !== null && (
+                  <Text
+                    color={Math.abs(bigEquationResult - 20) < 0.0001 ? 'green.500' : 'red.500'}
+                    fontWeight="bold"
+                  >
+                    Result: {bigEquationResult.toFixed(4)}
+                  </Text>
+                )}
+              </HStack>
+              <Box
+                p={2}
+                bg="red.50"
+                borderRadius="md"
+                minH="100px"
+              >
+                <HStack spacing={2}>
+                  <SortableContext
+                    items={bigSlots.map(slot => slot.id)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {bigSlots.map((slot, index) => (
+                      <SortableCard
+                        key={slot.id}
+                        id={slot.id}
+                        card={slot.card}
+                        index={index}
+                        onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
+                      />
+                    ))}
+                  </SortableContext>
+                </HStack>
+              </Box>
+            </Box>
+          </HStack>
+        ) : (
+          /* For single bet types, show single equation */
+          <>
+            {/* Small Equation */}
+            {betType === 'small' && (
+              <Box>
+                <HStack justify="space-between" mb={2}>
+                  <Text fontWeight="bold">Small Equation (Target: 1)</Text>
+                  {smallEquationResult !== null && (
+                    <Text
+                      color={Math.abs(smallEquationResult - 1) < 0.0001 ? 'green.500' : 'red.500'}
+                      fontWeight="bold"
+                    >
+                      Result: {smallEquationResult.toFixed(4)}
+                    </Text>
+                  )}
+                </HStack>
+                <Box
+                  p={2}
+                  bg="blue.50"
+                  borderRadius="md"
+                  minH="100px"
+                >
+                  <HStack spacing={2}>
+                    <SortableContext
+                      items={smallSlots.map(slot => slot.id)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {smallSlots.map((slot, index) => (
+                        <SortableCard
+                          key={slot.id}
+                          id={slot.id}
+                          card={slot.card}
+                          index={index}
+                          onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
+                        />
+                      ))}
+                    </SortableContext>
+                  </HStack>
+                </Box>
+              </Box>
+            )}
+
+            {/* Big Equation */}
+            {betType === 'big' && (
+              <Box>
+                <HStack justify="space-between" mb={2}>
+                  <Text fontWeight="bold">Big Equation (Target: 20)</Text>
+                  {bigEquationResult !== null && (
+                    <Text
+                      color={Math.abs(bigEquationResult - 20) < 0.0001 ? 'green.500' : 'red.500'}
+                      fontWeight="bold"
+                    >
+                      Result: {bigEquationResult.toFixed(4)}
+                    </Text>
+                  )}
+                </HStack>
+                <Box
+                  p={2}
+                  bg="red.50"
+                  borderRadius="md"
+                  minH="100px"
+                >
+                  <HStack spacing={2}>
+                    <SortableContext
+                      items={bigSlots.map(slot => slot.id)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {bigSlots.map((slot, index) => (
+                        <SortableCard
+                          key={slot.id}
+                          id={slot.id}
+                          card={slot.card}
+                          index={index}
+                          onRemove={slot.card ? () => handleRemoveCard(slot.id) : undefined}
+                        />
+                      ))}
+                    </SortableContext>
+                  </HStack>
+                </Box>
+              </Box>
+            )}
+          </>
         )}
 
         <Button
           colorScheme="teal"
           onClick={handleSubmit}
-          isDisabled={availableCards.length > 0}
+          isDisabled={betType === 'both' ? (availableCardsSmall.length > 0 || availableCardsBig.length > 0) : availableCards.length > 0}
         >
           Submit Equation{betType === 'both' ? 's' : ''}
         </Button>

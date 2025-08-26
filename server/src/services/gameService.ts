@@ -66,11 +66,12 @@ export class GameService {
         cards: [],
         operationCards: [],
         bet: 0,
-        betType: null,
+        betType: 'not selected',
         isActive: false,
         isFolded: true,
         isSquareRoot: false,
-        hasMultiply: false
+        hasMultiply: false,
+        isAllIn: false
       };
       game.players.push(spectator);
       this.notifyGameUpdate(gameId);
@@ -93,11 +94,12 @@ export class GameService {
         { type: 'operation', operation: 'divide' }
       ],
       bet: 0,
-      betType: null,
+      betType: 'not selected',
       isActive: true,
       isFolded: false,
       isSquareRoot: false,
-      hasMultiply: false
+      hasMultiply: false,
+      isAllIn: false
     };
 
     game.players.push(player);
@@ -110,6 +112,17 @@ export class GameService {
     if (!game) {
       throw new Error('Game not found');
     }
+
+    // Filter out players with 0 chips
+    const activePlayers = game.players.filter(p => p.chips > 0);
+    
+    // If less than 2 players remain, end the game
+    if (activePlayers.length < 2) {
+      throw new Error('Not enough players with chips to start a game');
+    }
+
+    // Update game players to only include those with chips
+    game.players = activePlayers;
 
     // For single player testing, add a bot player if needed
     if (game.players.length === 1) {
@@ -124,11 +137,12 @@ export class GameService {
           { type: 'operation', operation: 'divide' }
         ],
         bet: 0,
-        betType: null,
+        betType: 'not selected',
         isActive: true,
         isFolded: false,
         isSquareRoot: false,
-        hasMultiply: false
+        hasMultiply: false,
+        isAllIn: false
       };
       game.players.push(botPlayer);
     }
@@ -152,12 +166,13 @@ export class GameService {
         { type: 'operation', operation: 'divide' }
       ];
       player.bet = 0;
-      player.betType = null;
+      player.betType = 'not selected';
       player.isActive = true;
       player.isFolded = false;
       player.submittedEquations = undefined;
       player.hasMultiply = false;
       player.chips = currentChips; // Restore chips
+      player.isAllIn = false;
     });
 
     this.notifyGameUpdate(game.id);
@@ -421,6 +436,45 @@ export class GameService {
     }
   }
 
+  resetChips(gameId: string): GameState {
+    const game = this.games.get(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    // Reset all players' state including cards and chips
+    game.players.forEach(player => {
+      player.chips = 1000; // Or whatever your starting chip amount is
+      player.cards = []; // Clear player's cards
+      player.operationCards = [ // Reset operation cards to default set
+        { type: 'operation', operation: 'add' },
+        { type: 'operation', operation: 'subtract' },
+        { type: 'operation', operation: 'divide' }
+      ];
+      player.isActive = true;
+      player.isFolded = false;
+      player.isAllIn = false;
+      player.bet = 0;
+      player.betType = 'not selected';
+      player.isSquareRoot = false;
+      player.hasMultiply = false;
+      player.submittedEquations = undefined;
+    });
+
+    // Reset game state
+    game.phase = 'waiting';
+    game.pot = 0;
+    game.currentBet = 0;
+    game.currentPlayer = '';
+    game.winners = { small: [], big: [] };
+    game.equationResults = undefined;
+    game.deck = this.createDeck(); // Create a fresh deck
+    game.round = 1; // Reset round counter
+
+    this.notifyGameUpdate(gameId);
+    return game;
+  }
+
   private handleBet(game: GameState, player: Player, amount: number): void {
     console.log('Handling bet:', { 
       playerId: player.id, 
@@ -429,11 +483,15 @@ export class GameService {
       playerChips: player.chips 
     });
     
-    if (amount <= game.currentBet) {
-      throw new Error('Bet must be higher than current bet');
-    }
+    // if (amount < game.currentBet) {
+    //   throw new Error('Bet must be higher than current bet');
+    // }
     if (amount > player.chips) {
       throw new Error('Not enough chips');
+    }
+    if (amount === player.chips) {
+      console.log('Player is all-in:', player.id, amount);
+      player.isAllIn = true;
     }
 
     // Check if bet would exceed the lowest chip player's amount
@@ -445,9 +503,9 @@ export class GameService {
 
     // Update player's chips and bet
     player.chips -= amount;
-    player.bet += amount;
+    player.bet = amount + game.currentBet;
     game.pot += amount;
-    game.currentBet = amount;
+    game.currentBet += amount;
     
     console.log('Bet handled:', { 
       playerChips: player.chips, 
@@ -465,7 +523,7 @@ export class GameService {
   }
 
   private checkPlayerElimination(game: GameState, player: Player): void {
-    if (player.chips <= 0) {
+    if (player.chips <= 0 && !player.isAllIn) {
       console.log('Player eliminated due to no chips:', player.id);
       player.isFolded = true;
       player.isActive = false;
@@ -499,6 +557,11 @@ export class GameService {
     const callAmount = game.currentBet - player.bet;
     if (callAmount > player.chips) {
       throw new Error('Not enough chips');
+    }
+
+    if (callAmount === player.chips) {
+      console.log('Player is all-in:', player.id, callAmount);
+      player.isAllIn = true;
     }
 
     player.chips -= callAmount;
@@ -585,7 +648,7 @@ export class GameService {
     this.notifyGameUpdate(game.id);
   }
 
-  private handleBetType(game: GameState, player: Player, betType: 'small' | 'big' | 'both'): void {
+  private handleBetType(game: GameState, player: Player, betType: 'small' | 'big' | 'both' | 'not selected'): void {
     console.log('Handling bet type:', { 
       playerId: player.id, 
       betType, 
@@ -858,7 +921,7 @@ export class GameService {
     }
 
     // Verify that all players have exactly the target number of number cards
-    // Skip players who are waiting for card swap
+    // Skip players who are waiting for swap
     const allPlayersHaveTargetCards = game.players.every(p => 
       p.hasMultiply || p.cards.filter(c => c.type === 'number').length === targetNumberCards
     );
@@ -1110,6 +1173,9 @@ export class GameService {
             eqResults.big = { expr, result: val };
           }
         }
+      }
+      if (player.betType === 'not selected') {
+        throw new Error('Player ' + player.name + ' did not select a bet type');
       }
       
       results.push(entry);

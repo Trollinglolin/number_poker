@@ -28,7 +28,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Card as GameCard } from '../shared/types';
 
 interface EquationBuilderProps {
-  betType: 'small' | 'big' | 'both';
+  betType: 'small' | 'big' | 'both' | 'not selected';
   cards: GameCard[];
   operationCards: GameCard[];
   onSubmit: (equations: { small?: string; big?: string }) => void;

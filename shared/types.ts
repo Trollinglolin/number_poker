@@ -21,12 +21,13 @@ export interface Player {
   cards: Card[];
   operationCards: OperationCard[];
   bet: number;
-  betType: 'small' | 'big' | 'both' | null;
+  betType: 'small' | 'big' | 'both' | 'not selected';
   isActive: boolean;
   isFolded: boolean;
   submittedEquations?: { small?: string; big?: string };
   isSquareRoot: boolean;
   hasMultiply: boolean;
+  isAllIn: boolean;
 }
 
 export interface GameState {
@@ -60,7 +61,7 @@ export type GameAction = {
   type: 'bet' | 'fold' | 'call' | 'raise' | 'selectBetType' | 'submitEquation' | 'continue' | 'swapCard' | 'noSwap';
   playerId: string;
   amount?: number;
-  betType?: 'small' | 'big' | 'both';
+  betType?: 'small' | 'big' | 'both' | 'not selected';
   equation?: string;
   equations?: { small?: string; big?: string };
   swapCardType?: OperationType;

@@ -12,6 +12,7 @@ interface GameContextType {
   createGame: () => Promise<string>;
   joinGame: (gameId: string, playerName: string, existingPlayerId?: string) => Promise<string>;
   startGame: () => Promise<void>;
+  resetChips: () => Promise<void>;
   performAction: (action: GameAction) => void;
   socket: Socket | null;
   swapRequest: {
@@ -396,6 +397,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetChips = async () => {
+    if (!gameId) return;
+    
+    try {
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      const response = await axios.post(`${baseUrl}/api/games/${gameId}/reset-chips`);
+      setGame(response.data);
+    } catch (err) {
+      console.error('Error resetting chips:', err);
+      throw err;
+    }
+  };
+
   const performAction = async (action: GameAction) => {
     if (!socketRef.current?.connected) {
       throw new Error('Not connected to game server');
@@ -423,10 +439,11 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createGame,
     joinGame,
     startGame,
+    resetChips,
     performAction,
     socket: socketRef.current,
     swapRequest,
-    setSwapRequest
+    setSwapRequest,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

@@ -82,6 +82,22 @@ export default function createGameRoutes(gameService: GameService) {
     }
   });
 
+  // Reset all players' chips and set game to waiting phase
+  router.post('/:gameId/reset-chips', (req: Request, res: Response) => {
+    try {
+      console.log('Received request to reset chips for game:', req.params.gameId);
+      const { gameId } = req.params;
+      const updatedGame = gameService.resetChips(gameId);
+      res.json(updatedGame);
+    } catch (error) {
+      console.error('Error resetting chips:', error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : 'Failed to reset chips',
+        error: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
   // Perform a game action
   router.post('/:gameId/action', (req: Request, res: Response) => {
     try {

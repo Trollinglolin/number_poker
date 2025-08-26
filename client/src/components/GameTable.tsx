@@ -237,10 +237,12 @@ const PlayerHand: React.FC<{
 };
 
 export const GameTable: React.FC = () => {
-  const { game, playerId, performAction, startGame, swapRequest, setSwapRequest } = useGame();
+  const { game, playerId, performAction, startGame, swapRequest, setSwapRequest, resetChips } = useGame();
   const [betAmount, setBetAmount] = useState<number>(0);
   const [isBetting, setIsBetting] = useState(false);
   const [isStartingNewRound, setIsStartingNewRound] = useState(false);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [winner, setWinner] = useState<Player | null>(null);
   const toast = useToast();
   const lastPhaseRef = React.useRef<string>('');
   const lastCurrentPlayerRef = React.useRef<string>('');
@@ -478,21 +480,66 @@ export const GameTable: React.FC = () => {
     
     try {
       setIsStartingNewRound(true);
-      console.log('Starting new round...', { gameId: game.id });
-      await startGame(); // Reuse the startGame function to reset the game
-      console.log('New round started successfully');
-      toast({
-        title: 'New Round Started',
-        description: 'The game has been reset with new cards and chips',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      // Check if there's only one player with chips left
+      const playersWithChips = game.players.filter(p => p.chips > 0);
+      if (playersWithChips.length === 1) {
+        setWinner(playersWithChips[0]);
+        setShowWinnerModal(true);
+      } else {
+        console.log('Starting new round...', { gameId: game.id });
+        await startGame(); // Reuse the startGame function to reset the game state
+      
+        console.log('New round started successfully');
+        toast({
+          title: 'New Round Started',
+          description: 'The game has been reset with new cards and chips',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
     } catch (err) {
       console.error('Error starting new round:', err);
       toast({
         title: 'Error starting new round',
         description: err instanceof Error ? err.message : 'Unknown error occurred',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsStartingNewRound(false);
+    }
+  };
+
+  const resetChipsAndSetWaiting = async () => {
+    if (!game) return;
+    
+    try {
+      setIsStartingNewRound(true);
+      
+      // Reset all players' chips
+      console.log("resetting chips...")
+      await resetChips();
+      
+      // Start a new game
+      // await startGame();
+      
+      // Close the winner modal
+      setShowWinnerModal(false);
+      
+      toast({
+        title: 'Game Reset',
+        description: 'All players\' chips have been reset. The game is now in waiting phase.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (err) {
+      console.error('Error resetting game:', err);
+      toast({
+        title: 'Error resetting game',
+        description: err instanceof Error ? err.message : 'Failed to reset game',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -557,7 +604,7 @@ export const GameTable: React.FC = () => {
               <Text>Create your equation(s) to get as close as possible to 1 or 20</Text>
               
               {/* Show bet type selection if not yet selected */}
-              {!currentPlayer.betType && (
+              {currentPlayer.betType === 'not selected' && (
                 <HStack spacing={4}>
                   <Button
                     colorScheme="blue"
@@ -584,17 +631,36 @@ export const GameTable: React.FC = () => {
               )}
               
               {/* Show equation builder based on bet type */}
-              {currentPlayer.betType && !currentPlayer.submittedEquations && (
+              {currentPlayer.betType !== 'not selected' && !currentPlayer.submittedEquations && (
+                <VStack spacing={4}>
+                <HStack>
+                  <Button
+                    colorScheme="gray"
+                    size="md"
+                    onClick={() => {
+                      // Clear the selected bet type to go back to selection
+                      handleAction({ 
+                        type: 'selectBetType', 
+                        playerId: currentPlayer.id, 
+                        betType: 'not selected'
+                      });
+                    }}
+                    leftIcon={<span>←</span>}
+                  >
+                    Back to Bet Type
+                  </Button>
+                </HStack>
                 <EquationBuilder
                   betType={currentPlayer.betType}
                   cards={currentPlayer.cards}
                   operationCards={currentPlayer.operationCards}
                   onSubmit={equations => handleAction({ type: 'submitEquation', playerId: currentPlayer.id, equations })}
                 />
+                </VStack>
               )}
               
               {/* If already submitted, show a message */}
-              {currentPlayer.betType && currentPlayer.submittedEquations && (
+              {currentPlayer.betType !== 'not selected' && currentPlayer.submittedEquations && (
                 <Text color="green.600" fontWeight="bold">Equations submitted! Waiting for other players...</Text>
               )}
             </VStack>
@@ -725,6 +791,39 @@ export const GameTable: React.FC = () => {
               </HStack>
             </VStack>
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Winner Congratulation Modal */}
+      <Modal isOpen={showWinnerModal} onClose={() => setShowWinnerModal(false)} isCentered>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader textAlign="center">🎉 Congratulations! 🎉</ModalHeader>
+          <ModalBody textAlign="center" py={6}>
+            <Text fontSize="xl" fontWeight="bold" mb={4}>
+              {winner?.name} wins the game!
+            </Text>
+            <Text mb={6}>
+              {winner?.name} is the last player with chips remaining.
+            </Text>
+          </ModalBody>
+          <ModalFooter justifyContent="center" pb={6}>
+            <Button 
+              colorScheme="blue" 
+              mr={3}
+              onClick={resetChipsAndSetWaiting}
+              isLoading={isStartingNewRound}
+            >
+              Reset All Chips & Start New Game
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowWinnerModal(false)}
+              isDisabled={isStartingNewRound}
+            >
+              Close
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </Container>

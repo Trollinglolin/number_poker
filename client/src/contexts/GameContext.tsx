@@ -12,6 +12,7 @@ interface GameContextType {
   createGame: () => Promise<string>;
   joinGame: (gameId: string, playerName: string, existingPlayerId?: string) => Promise<string>;
   startGame: () => Promise<void>;
+  startGameWithBot: () => Promise<void>;
   resetChips: () => Promise<void>;
   performAction: (action: GameAction) => void;
   socket: Socket | null;
@@ -397,6 +398,36 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const startGameWithBot = async () => {
+    if (!gameId) {
+      throw new Error('No game ID available');
+    }
+    try {
+      console.log('Sending start game with bot request...', { gameId });
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? window.location.origin 
+        : 'http://localhost:3001';
+      const response = await axios.post(`${baseUrl}/api/games/${gameId}/start-with-bot`);
+      console.log('Start game with bot response:', response.data);
+      
+      // Wait a moment for the socket to receive the update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // If the game hasn't updated, try to fetch the current state
+      if (!game || game.phase === 'waiting') {
+        console.log('Game state not updated via socket, fetching current state...');
+        const gameResponse = await axios.get(`${baseUrl}/api/games/${gameId}`);
+        setGame(gameResponse.data);
+      }
+    } catch (error) {
+      console.error('Error in startGameWithBot:', error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || 'Failed to start game with bot');
+      }
+      throw error;
+    }
+  };
+
   const resetChips = async () => {
     if (!gameId) return;
     
@@ -439,6 +470,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createGame,
     joinGame,
     startGame,
+    startGameWithBot,
     resetChips,
     performAction,
     socket: socketRef.current,
@@ -447,4 +479,4 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
-}; 
+};

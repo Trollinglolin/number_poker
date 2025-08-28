@@ -237,7 +237,7 @@ const PlayerHand: React.FC<{
 };
 
 export const GameTable: React.FC = () => {
-  const { game, playerId, performAction, startGame, swapRequest, setSwapRequest, resetChips } = useGame();
+  const { game, playerId, performAction, startGame, startGameWithBot, swapRequest, setSwapRequest, resetChips } = useGame();
   const [betAmount, setBetAmount] = useState<number>(0);
   const [isBetting, setIsBetting] = useState(false);
   const [isStartingNewRound, setIsStartingNewRound] = useState(false);
@@ -475,6 +475,23 @@ export const GameTable: React.FC = () => {
     }
   };
 
+  const handleStartGameWithBot = async () => {
+    try {
+      console.log('Starting game...', { gameId: game.id, players: game.players });
+      await startGameWithBot();
+      console.log('Game started successfully');
+    } catch (err) {
+      console.error('Error starting game:', err);
+      toast({
+        title: 'Error starting game',
+        description: err instanceof Error ? err.message : 'Unknown error occurred',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   const handleStartNewRound = async () => {
     if (!game) return;
     
@@ -573,12 +590,20 @@ export const GameTable: React.FC = () => {
         </Box>
 
         {game.phase === 'waiting' && (
-          <Button
-            colorScheme="green"
-            onClick={handleStartGame}
-          >
-            Start Game (Test Mode)
-          </Button>
+          <HStack spacing={4} mb={4}>
+            <Button
+              colorScheme="green"
+              onClick={handleStartGame}
+            >
+              Start Game
+            </Button>
+            <Button
+              colorScheme="teal"
+              onClick={handleStartGameWithBot}
+            >
+              Start Game with Bot (Test Mode)
+            </Button>
+          </HStack>
         )}
 
         <Grid templateColumns="repeat(2, 1fr)" gap={6} w="100%">

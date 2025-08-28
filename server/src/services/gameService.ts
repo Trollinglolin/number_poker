@@ -125,6 +125,73 @@ export class GameService {
     game.players = activePlayers;
 
     // For single player testing, add a bot player if needed
+    // if (game.players.length === 1) {
+    //   const botPlayer: Player = {
+    //     id: 'bot-1',
+    //     name: 'Bot Player',
+    //     chips: game.players[0].chips, // Match human player's chips
+    //     cards: [],
+    //     operationCards: [
+    //       { type: 'operation', operation: 'add' },
+    //       { type: 'operation', operation: 'subtract' },
+    //       { type: 'operation', operation: 'divide' }
+    //     ],
+    //     bet: 0,
+    //     betType: 'not selected',
+    //     isActive: true,
+    //     isFolded: false,
+    //     isSquareRoot: false,
+    //     hasMultiply: false,
+    //     isAllIn: false
+    //   };
+    //   game.players.push(botPlayer);
+    // }
+
+    // Reset game state while preserving chips
+    game.deck = this.createDeck();
+    game.phase = 'preflop'; // Start with preflop betting phase
+    game.currentPlayer = game.players[0].id;
+    game.currentBet = 0;
+    game.pot = 0;
+    game.winners = { small: [], big: [] };
+    game.equationResults = undefined; // Clear equation results
+    
+    // Reset player state while preserving chips
+    game.players.forEach(player => {
+      const currentChips = player.chips; // Store current chips
+      player.cards = [];
+      player.operationCards = [
+        { type: 'operation', operation: 'add' },
+        { type: 'operation', operation: 'subtract' },
+        { type: 'operation', operation: 'divide' }
+      ];
+      player.bet = 0;
+      player.betType = 'not selected';
+      player.isActive = true;
+      player.isFolded = false;
+      player.submittedEquations = undefined;
+      player.hasMultiply = false;
+      player.chips = currentChips; // Restore chips
+      player.isAllIn = false;
+    });
+
+    this.notifyGameUpdate(game.id);
+  }
+
+    startGameWithBot(gameId: string): void {
+    const game = this.games.get(gameId);
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    // Filter out players with 0 chips
+    const activePlayers = game.players.filter(p => p.chips > 0);
+    
+
+    // Update game players to only include those with chips
+    game.players = activePlayers;
+
+    // For single player testing, add a bot player if needed
     if (game.players.length === 1) {
       const botPlayer: Player = {
         id: 'bot-1',
@@ -502,9 +569,9 @@ export class GameService {
     }
 
     // Update player's chips and bet
-    player.chips -= amount;
+    player.chips -= amount + game.currentBet - player.bet;
+    game.pot += amount + game.currentBet - player.bet;
     player.bet = amount + game.currentBet;
-    game.pot += amount;
     game.currentBet += amount;
     
     console.log('Bet handled:', { 
@@ -564,6 +631,7 @@ export class GameService {
       player.isAllIn = true;
     }
 
+
     player.chips -= callAmount;
     player.bet += callAmount;
     game.pot += callAmount;
@@ -578,6 +646,11 @@ export class GameService {
     // Check if player is eliminated
     this.checkPlayerElimination(game, player);
 
+    if (callAmount > 0 && game.players.every(p => p.bet === game.currentBet)) {
+      this.advanceGamePhase(game);
+      return;
+    }
+
     // Check if this is single player mode (one human player and one bot)
     const isSinglePlayerMode = game.players.length === 2 && 
       game.players.some(p => p.id.startsWith('bot-')) && 
@@ -585,15 +658,15 @@ export class GameService {
 
     // If it's single player mode and the human player called (not checked),
     // and we're in the first betting round, advance to next phase
-    if (isSinglePlayerMode && !player.id.startsWith('bot-') && callAmount > 0 && game.phase === 'betting1') {
-      console.log('Single player mode: Human player called in betting1, advancing to next phase');
-      this.advanceGamePhase(game);
-      return;
-    }
+    // if (isSinglePlayerMode && !player.id.startsWith('bot-') && callAmount > 0 && game.phase === 'betting1') {
+    //   console.log('Single player mode: Human player called in betting1, advancing to next phase');
+    //   this.advanceGamePhase(game);
+    //   return;
+    // }
 
     // Check if all active players have matched the current bet
-    const activePlayers = game.players.filter(p => !p.isFolded);
-    const allBetsMatched = activePlayers.every(p => p.bet === game.currentBet);
+    // const activePlayers = game.players.filter(p => !p.isFolded);
+    // const allBetsMatched = activePlayers.every(p => p.bet === game.currentBet);
     
     // For betting2, we need to check if we've completed a full round of betting
     // if (game.phase === 'betting2' && allBetsMatched) {
@@ -788,25 +861,19 @@ export class GameService {
     if (game.phase === 'preflop') {
       // After preflop betting round, move to dealing1 phase
       game.phase = 'dealing1';
+      game.currentPlayer = game.players.filter(p => !p.isFolded)[0].id;
       // Deal initial 2 cards to each player
       this.dealCards(game, 2, true);
     } else if (game.phase === 'betting1') {
       // After first betting round, move to dealing2 phase
       game.phase = 'dealing2';
+      game.currentPlayer = game.players.filter(p => !p.isFolded)[0].id
       // Deal additional cards (total of 4)
       this.dealCards(game, 4, true);
     } else if (game.phase === 'betting2') {
       // After second betting round, move to equation phase
+      game.currentPlayer = "";
       game.phase = 'equation';
-      // Set the first active player as current player for equation phase
-      const firstActivePlayer = game.players.find(p => !p.isFolded);
-      if (firstActivePlayer) {
-        game.currentPlayer = firstActivePlayer.id;
-        // Handle bot turns immediately
-        if (game.currentPlayer.startsWith('bot-')) {
-          this.handleBotTurn(game);
-        }
-      }
     } else if (game.phase === 'equation') {
       // After equation phase, end the game
       this.endGame(game);
@@ -1226,20 +1293,51 @@ export class GameService {
       }
     }
 
-    // Apply tiebreakers
-    const smallWinner = smallWinners.length > 0 ? smallWinners.reduce((a, b) => {
-      // For small bet: compare smallest card's color (ascending order)
-      const aMinCard = Math.min(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
-      const bMinCard = Math.min(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
-      return aMinCard < bMinCard ? a : b;
-    }) : null;
 
-    const bigWinner = bigWinners.length > 0 ? bigWinners.reduce((a, b) => {
-      // For big bet: compare biggest card's color (ascending order)
-      const aMaxCard = Math.max(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
-      const bMaxCard = Math.max(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
-      return aMaxCard > bMaxCard ? a : b;
-    }) : null;
+    const getSmallestCardValue = (player: Player) => {
+      const numberCards = player.cards.filter(c => c.type === 'number');
+      if (numberCards.length === 0) return Infinity; // or handle this case
+      return Math.min(...numberCards.map(c => (c.value * 10) + colorValues[c.color]));
+    };
+    
+    // For small bet: find the player with smallest card's color (ascending order)
+    const smallWinner = smallWinners.length > 0 
+      ? smallWinners.reduce((winner, current) => 
+          getSmallestCardValue(current) < getSmallestCardValue(winner) 
+            ? current 
+            : winner
+        )
+      : null;
+
+    const getBiggestCardValue = (player: Player) => {
+      const numberCards = player.cards.filter(c => c.type === 'number');
+      if (numberCards.length === 0) return -Infinity; // or handle this case
+      return Math.max(...numberCards.map(c => (c.value * 10) + colorValues[c.color]));
+    };
+    
+    // For big bet
+    const bigWinner = bigWinners.length > 0 
+      ? bigWinners.reduce((winner, current) => 
+          getBiggestCardValue(current) > getBiggestCardValue(winner) 
+            ? current 
+            : winner
+        )
+      : null;
+
+    // // Apply tiebreakers
+    // const smallWinner = smallWinners.length > 0 ? smallWinners.reduce((a, b) => {
+    //   // For small bet: compare smallest card's color (ascending order)
+    //   const aMinCard = Math.min(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+    //   const bMinCard = Math.min(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+    //   return aMinCard < bMinCard ? a : b;
+    // }) : null;
+
+    // const bigWinner = bigWinners.length > 0 ? bigWinners.reduce((a, b) => {
+    //   // For big bet: compare biggest card's color (ascending order)
+    //   const aMaxCard = Math.max(...a.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+    //   const bMaxCard = Math.max(...b.cards.filter(c => c.type === 'number').map(c => colorValues[c.color]));
+    //   return aMaxCard > bMaxCard ? a : b;
+    // }) : null;
 
     // Store equation results in game state for client display
     game.equationResults = equationResults;

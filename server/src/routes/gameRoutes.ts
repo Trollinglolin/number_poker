@@ -82,6 +82,27 @@ export default function createGameRoutes(gameService: GameService) {
     }
   });
 
+  // Start a game with a bot
+  router.post('/:gameId/start-with-bot', (req: Request, res: Response) => {
+    try {
+      const { gameId } = req.params;
+      console.log('Received start game with bot request for game:', gameId);
+      
+      gameService.startGameWithBot(gameId);
+      console.log('Game started with bot successfully');
+      
+      // Send the updated game state in the response
+      const game = gameService.getGame(gameId);
+      res.json(game);
+    } catch (error) {
+      console.error('Error starting game with bot:', error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Failed to start game with bot',
+        error: error instanceof Error ? error.stack : undefined
+      });
+    }
+  });
+
   // Reset all players' chips and set game to waiting phase
   router.post('/:gameId/reset-chips', (req: Request, res: Response) => {
     try {

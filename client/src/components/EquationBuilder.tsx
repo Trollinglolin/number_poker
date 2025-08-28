@@ -390,8 +390,41 @@ export const EquationBuilder: React.FC<EquationBuilderProps> = ({
   };
 
   const buildEquation = (slots: CardSlot[]): string | null => {
-    const equation = slots
-      .filter(slot => slot.card !== null)
+  // Filter out null cards first
+    const nonNullSlots = slots.filter(slot => slot.card !== null);
+    
+    // Check for empty slots
+    if (nonNullSlots.length === 0) return null;
+
+    // Check for operator at start or end
+    const firstCard = nonNullSlots[0].card!;
+    const lastCard = nonNullSlots[nonNullSlots.length - 1].card!;
+    
+    if (firstCard.type !== 'number' || lastCard.type !== 'number') {
+      return null;
+    }
+
+    // Check for consecutive invalid card combinations
+    for (let i = 0; i < nonNullSlots.length - 1; i++) {
+      const current = nonNullSlots[i].card!;
+      const next = nonNullSlots[i + 1].card!;
+
+      // Check for two consecutive number cards
+      if (current.type === 'number' && next.type === 'number') {
+        return null;
+      }
+
+      // Check for consecutive operators (with square root exception)
+      if (current.type === 'operation' && next.type === 'operation') {
+        // Allow square root after certain operators
+        const allowedBeforeSqrt = ['add', 'subtract', 'multiply', 'divide'];
+        if (!(next.operation === 'squareRoot' && allowedBeforeSqrt.includes(current.operation))) {
+          return null;
+        }
+      }
+    }
+
+    const equation = nonNullSlots
       .map(slot => {
         if (!slot.card) return '';
         if (slot.card.type === 'number') return slot.card.value.toString();

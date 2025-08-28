@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
 import { GameState, GameAction, GameEvent } from '../shared/types';
 import { useToast } from '@chakra-ui/react';
+import { updateActivity, clearActivity, DiscordActivity } from '../discord';
 
 interface GameContextType {
   game: GameState | null;
@@ -34,6 +35,35 @@ export const useGame = () => {
   return context;
 };
 
+// Update Discord activity based on game state
+const updateDiscordActivity = async (game: GameState | null, playerId: string | null) => {
+  if (!game) {
+    await clearActivity();
+    return;
+  }
+
+  const activity: DiscordActivity = {
+    state: `Playing ${game.players.length} player game`,
+    details: game.phase === 'waiting' ? 'In Lobby' : 'In Game',
+    assets: {
+      large_image: 'game_logo',
+      large_text: 'Number Poker',
+    },
+    instance: true,
+  };
+
+  // Add more specific game state details if game is in progress
+  if (game.phase !== 'waiting' && game.phase !== 'ended') {
+    const currentPlayer = game.players.find(p => p.id === playerId);
+    if (currentPlayer) {
+      activity.details = `Chips: ${currentPlayer.chips} | Pot: ${game.pot}`;
+      activity.state = `Round ${game.round} | ${game.phase}`;
+    }
+  }
+
+  await updateActivity(activity);
+};
+
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [game, setGame] = useState<GameState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -53,6 +83,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toast = useToast();
 
   // Initialize socket connection only once and keep it alive
+  // Update Discord activity when game state changes
+  useEffect(() => {
+    if (game) {
+      updateDiscordActivity(game, playerId);
+    }
+  }, [game, playerId]);
+
   useEffect(() => {
     if (!socketInitialized.current) {
       console.log('Initializing socket connection...');
@@ -230,8 +267,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []); // Empty dependency array - only run once on mount
 
-  const createGame = async () => {
+  const createGame = async (): Promise<string> => {
     try {
+      // Clear any existing game state
+      setGame(null);
+      setPlayerId(null);
+      setGameId(null);
+      await updateActivity({
+        state: 'Creating a new game',
+        details: 'Setting up...',
+        instance: true
+      });
       const baseUrl = process.env.NODE_ENV === 'production' 
         ? window.location.origin 
         : 'http://localhost:3001';
@@ -255,124 +301,141 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const joinGame = async (gameId: string, playerName: string, existingPlayerId?: string) => {
-    // Validate gameId is a string
-    if (typeof gameId !== 'string') {
-      console.error('Invalid game ID type:', typeof gameId);
-      throw new Error('Invalid game ID format');
-    }
-
-    // Check if we're already in this game
-    if (lastJoinedGame.current === gameId && !existingPlayerId) {
-      console.log('Already joined this game:', gameId);
-      return;
-    }
-
-    // Check if a join is in progress
-    if (joinInProgress.current) {
-      console.log('Join already in progress, ignoring request');
-      return;
-    }
-
+  // Function to join a game
+  const joinGame = async (gameId: string, playerName: string, existingPlayerId?: string): Promise<string> => {
+    if (joinInProgress.current) return '';
+    
+    // Ensure gameId is a string
+    const gameIdStr = gameId;
+    joinInProgress.current = true;
+    
     try {
-      joinInProgress.current = true;
-      console.log('Attempting to join game:', { gameId, playerName, existingPlayerId });
-      
-      // Only validate game ID format if we're joining an existing game
-      // (not when creating a new game)
-      if (gameId !== lastJoinedGame.current) {
-        try {
-          const baseUrl = process.env.NODE_ENV === 'production' 
-            ? window.location.origin 
-            : 'http://localhost:3001';
-          const gameCheck = await axios.get(`${baseUrl}/api/games/${gameId}`);
-          if (!gameCheck.data) {
-            throw new Error('Game not found');
-          }
-        } catch (err) {
-          if (axios.isAxiosError(err) && err.response?.status === 404) {
-            throw new Error('Game not found');
-          }
-          throw err;
-        }
-      }
-
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? window.location.origin 
-        : 'http://localhost:3001';
-      const response = await axios.post(`${baseUrl}/api/games/${gameId}/join`, {
-        playerName,
-        playerId: existingPlayerId
+      await updateActivity({
+        state: `Joining game ${gameId}`,
+        details: 'Connecting...',
+        instance: true
       });
-      
-      console.log('Join game response:', response.data);
-      const { playerId: newPlayerId } = response.data;
-      
-      // Update state
-      setPlayerId(newPlayerId);
-      setGameId(gameId);
-      lastJoinedGame.current = gameId;
-      setError(null);
-
-      // Handle socket room joining
-      if (socketRef.current?.connected) {
-        console.log('Socket ready, joining game room:', gameId);
-        socketRef.current.emit('joinGame', { gameId, playerId: newPlayerId });
-        
-        // Fetch current game state after joining
-        try {
-          const baseUrl = process.env.NODE_ENV === 'production' 
-            ? window.location.origin 
-            : 'http://localhost:3001';
-          const gameState = await axios.get(`${baseUrl}/api/games/${gameId}`);
-          setGame(gameState.data);
-        } catch (err) {
-          console.error('Error fetching game state:', err);
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch game state. Please try refreshing the page.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-      } else {
-        console.log('Socket not ready, queuing game join');
-        pendingGameJoin.current = { gameId, playerId: newPlayerId };
+      // Validate gameId is a string
+      if (typeof gameId !== 'string') {
+        console.error('Invalid game ID type:', typeof gameId);
+        throw new Error('Invalid game ID format');
       }
 
-      return newPlayerId;
+      // Check if we're already in this game
+      if (lastJoinedGame.current === gameId && !existingPlayerId) {
+        console.log('Already joined this game:', gameId);
+        return '';
+      }
+
+      // Check if a join is in progress
+      if (joinInProgress.current) {
+        console.log('Join already in progress, ignoring request');
+        return '';
+      }
+
+      try {
+        // Only validate game ID format if we're joining an existing game
+        // (not when creating a new game)
+        if (gameId !== lastJoinedGame.current) {
+          try {
+            const baseUrl = process.env.NODE_ENV === 'production' 
+              ? window.location.origin 
+              : 'http://localhost:3001';
+            const gameCheck = await axios.get(`${baseUrl}/api/games/${gameId}`);
+            if (!gameCheck.data) {
+              throw new Error('Game not found');
+            }
+          } catch (err) {
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+              throw new Error('Game not found');
+            }
+            throw err;
+          }
+        }
+
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? window.location.origin 
+          : 'http://localhost:3001';
+        const response = await axios.post(`${baseUrl}/api/games/${gameId}/join`, {
+          playerName,
+          playerId: existingPlayerId
+        });
+        
+        console.log('Join game response:', response.data);
+        const { playerId: newPlayerId } = response.data;
+        
+        // Update state
+        setPlayerId(newPlayerId);
+        setGameId(gameId);
+        lastJoinedGame.current = gameId;
+        setError(null);
+
+        // Handle socket room joining
+        if (socketRef.current?.connected) {
+          console.log('Socket ready, joining game room:', gameId);
+          socketRef.current.emit('joinGame', { gameId, playerId: newPlayerId });
+          
+          // Fetch current game state after joining
+          try {
+            const baseUrl = process.env.NODE_ENV === 'production' 
+              ? window.location.origin 
+              : 'http://localhost:3001';
+            const gameState = await axios.get(`${baseUrl}/api/games/${gameId}`);
+            setGame(gameState.data);
+          } catch (err) {
+            console.error('Error fetching game state:', err);
+            toast({
+              title: 'Error',
+              description: 'Failed to fetch game state. Please try refreshing the page.',
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+          }
+        } else {
+          console.log('Socket not ready, queuing game join');
+          pendingGameJoin.current = { gameId, playerId: newPlayerId };
+        }
+
+        return newPlayerId;
+      } catch (err) {
+        console.error('Error joining game:', err);
+        let errorMessage = 'Failed to join game';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.response?.status === 400) {
+            errorMessage = 'Invalid game ID or game not found';
+          } else if (err.response?.status === 404) {
+            errorMessage = 'Game not found';
+          } else if (err.response?.status === 409) {
+            errorMessage = 'Game is already in progress';
+          } else {
+            errorMessage = err.response?.data?.message || errorMessage;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        joinInProgress.current = false;
+      }
     } catch (err) {
       console.error('Error joining game:', err);
-      let errorMessage = 'Failed to join game';
-      
-      if (axios.isAxiosError(err)) {
-        if (err.response?.status === 400) {
-          errorMessage = 'Invalid game ID or game not found';
-        } else if (err.response?.status === 404) {
-          errorMessage = 'Game not found';
-        } else if (err.response?.status === 409) {
-          errorMessage = 'Game is already in progress';
-        } else {
-          errorMessage = err.response?.data?.message || errorMessage;
-        }
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      joinInProgress.current = false;
+      throw err;
     }
   };
 
   const startGame = async () => {
-    if (!gameId) {
-      throw new Error('No game ID available');
-    }
+    if (!socketRef.current || !gameId) return;
+    
     try {
-      console.log('Sending start game request...', { gameId });
+      await updateActivity({
+        state: 'Game is starting',
+        details: 'Get ready!',
+        instance: true
+      });
       const baseUrl = process.env.NODE_ENV === 'production' 
         ? window.location.origin 
         : 'http://localhost:3001';
@@ -413,14 +476,33 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const performAction = async (action: GameAction) => {
-    if (!socketRef.current?.connected) {
-      throw new Error('Not connected to game server');
+    if (!socketRef.current || !gameId) return;
+    
+    // Update activity based on the action
+    const activityUpdate: Partial<DiscordActivity> = {};
+    
+    if (action.type === 'bet' || action.type === 'call' || action.type === 'raise') {
+      const amount = action.amount || 0;
+      switch (action.type) {
+        case 'bet':
+          activityUpdate.details = `Bet ${amount} chips`;
+          break;
+        case 'call':
+          activityUpdate.details = `Called ${amount} chips`;
+          break;
+        case 'raise':
+          activityUpdate.details = `Raised to ${amount} chips`;
+          break;
+      }
+    } else if (action.type === 'fold') {
+      activityUpdate.details = 'Folded';
     }
-
-    if (!gameId) {
-      throw new Error('No game ID available');
+    
+    if (Object.keys(activityUpdate).length > 0) {
+      await updateActivity(activityUpdate as DiscordActivity);
     }
-
+    
+    socketRef.current.emit('gameAction', { gameId, action });
     try {
       console.log('Performing action:', { gameId, action });
       socketRef.current.emit('gameAction', { gameId, action });

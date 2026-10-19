@@ -116,7 +116,7 @@ class GameClient {
   private emit<T extends object = object>(event: 'room:create' | 'room:join', payload: object): Promise<Ack<T>> {
     return new Promise((resolve) => {
       const socket = this.socket;
-      if (!socket?.connected) return resolve({ ok: false, error: 'You are offline. Reconnecting...' });
+      if (!socket?.connected) return resolve({ ok: false, error: 'You are offline. Reconnecting…' });
       (socket.timeout(ACK_TIMEOUT) as any).emit(event, payload, (err: unknown, res: Ack<T>) =>
         resolve(err ? { ok: false, error: 'The server did not answer. Try again.' } : res),
       );
@@ -159,7 +159,7 @@ class GameClient {
   command(cmd: Command): Promise<Ack> {
     return new Promise((resolve) => {
       const socket = this.socket;
-      if (!socket?.connected) return resolve({ ok: false, error: 'You are offline. Reconnecting...' });
+      if (!socket?.connected) return resolve({ ok: false, error: 'You are offline. Reconnecting…' });
       (socket.timeout(ACK_TIMEOUT) as any).emit('room:command', cmd, (err: unknown, res: Ack) =>
         resolve(err ? { ok: false, error: 'The server did not answer. Try again.' } : res),
       );

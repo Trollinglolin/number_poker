@@ -55,7 +55,11 @@ web/      React 19 + Tailwind v4 + Motion: home, lobby and table screens, equati
 
 ## Interface notes
 
-- Phone first. Betting controls sit in a bottom dock; opponents are a swipeable row on phones and a sticky sidebar on large screens.
+- It looks and plays like a card room: an oval felt table with everyone seated around it, bets as chip stacks in front of each seat
+  that slide into the pot when a round closes, cards dealt out from the middle, and the pot flying to the winner. The felt, rail,
+  chips and cloth grain are all CSS (no images). Chip stacks are decoration, the exact number is always printed beside them.
+- Phone first. The table turns into a portrait oval and grows taller as more people sit (up to 8). Betting controls sit in a bottom
+  dock that also carries your own cards, so they are never scrolled out of view. Tap any seat for that player's full cards.
 - The equation builder works by tap, drag or keyboard (arrow keys move a placed card, Delete removes it), shows the live result and
   the distance to the target, and explains in words why an order is not valid.
 - Dark and light themes (follows the system, with a toggle), reduced-motion respected, native dialogs for focus handling.

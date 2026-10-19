@@ -48,7 +48,7 @@ function Screen() {
           role="status"
           className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-danger px-4 py-2 text-sm font-medium text-white"
         >
-          <WifiSlashIcon size={16} aria-hidden /> Connection lost. Reconnecting...
+          <WifiSlashIcon size={16} aria-hidden /> Connection lost. Reconnecting…
         </div>
       )}
       {body}
@@ -62,7 +62,7 @@ function Resuming() {
       <div className="w-full max-w-sm space-y-4">
         <div className="h-5 w-40 animate-pulse rounded-full bg-surface-3" />
         <div className="h-28 animate-pulse rounded-[24px] bg-surface-2" />
-        <p className="text-center text-sm text-muted">Rejoining your table...</p>
+        <p className="text-center text-sm text-muted">Rejoining your table…</p>
       </div>
     </div>
   );

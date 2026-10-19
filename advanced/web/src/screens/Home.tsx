@@ -8,6 +8,7 @@ import { useTheme } from '../lib/theme';
 import { cn } from '../lib/format';
 import { Button, Panel, useToast } from '../components/ui';
 import { PlayingCard } from '../components/cards';
+import { ChipStack } from '../components/Chips';
 import { RulesSheet } from '../components/Rules';
 
 const n = (value: number, color: 'gold' | 'silver' | 'bronze' | 'dark'): CardView => ({ id: `h${value}${color}`, kind: 'number', value, color });
@@ -107,7 +108,7 @@ export function Home({ initialCode }: { initialCode?: string }) {
         </div>
       </nav>
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <section className="grid items-center gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.02fr)] lg:gap-14 lg:py-14">
           <div>
             <h1 className="text-[2.6rem] font-semibold leading-[1.02] tracking-tighter sm:text-6xl">
@@ -197,7 +198,7 @@ export function Home({ initialCode }: { initialCode?: string }) {
               </Button>
               {offline && (
                 <p role="status" className="text-center text-sm text-muted">
-                  {status === 'offline' ? 'Cannot reach the server. Retrying...' : 'Connecting...'}
+                  {status === 'offline' ? 'Cannot reach the server. Retrying…' : 'Connecting…'}
                 </p>
               )}
             </Panel>
@@ -215,45 +216,66 @@ export function Home({ initialCode }: { initialCode?: string }) {
   );
 }
 
+/** a small table made from the same pieces as the real one: felt, plates, chips and a winning hand */
 function HeroVisual() {
+  const plates = [
+    { name: 'Mira', chips: '1,240', left: '17%', top: '26%' },
+    { name: 'Dev', chips: '860', left: '50%', top: '9%' },
+    { name: 'Noor', chips: '1,000', left: '83%', top: '26%' },
+  ];
   return (
-    <Panel innerClassName="overflow-hidden">
-      <div className="relative px-6 py-10 sm:px-10 sm:py-14" style={{ background: 'var(--felt)' }}>
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <div className="text-sm font-medium text-muted">Your equation</div>
-            <div className="mt-1 text-xs text-faint">Every card used once</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-medium text-muted">Target</div>
-            <div className="font-mono text-3xl font-semibold tabular text-big">20</div>
-          </div>
-        </div>
+    <div className="relative mx-auto w-full max-w-[620px]" style={{ aspectRatio: '1.28 / 1' }} aria-hidden>
+      <div className="rail absolute inset-0 rounded-[50%]" />
+      <div className="felt absolute inset-[7%_3.5%] rounded-[50%]" />
 
-        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
+      {plates.map((p, i) => (
+        <motion.div
+          key={p.name}
+          className="plate absolute -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 pb-1.5 pt-6 text-center"
+          style={{ left: p.left, top: p.top, width: 92 }}
+          initial={{ opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 + i * 0.1, type: 'spring', stiffness: 200, damping: 22 }}
+        >
+          <span className="absolute -top-4 left-1/2 grid size-9 -translate-x-1/2 place-items-center rounded-full bg-[#1d2b25] text-xs font-semibold ring-1 ring-white/20">
+            {p.name[0]}
+          </span>
+          <span className="block text-xs font-semibold">{p.name}</span>
+          <span className="block font-mono text-xs font-semibold tabular">{p.chips}</span>
+        </motion.div>
+      ))}
+
+      <div className="absolute left-1/2 top-[40%] flex -translate-x-1/2 flex-col items-center text-felt-ink">
+        <div className="flex items-end gap-2">
+          <ChipStack amount={140} size="md" label={false} />
+          <span className="font-mono text-3xl font-semibold tabular leading-none">140</span>
+        </div>
+        <span className="mt-1 text-[11px] text-felt-muted">pot</span>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-[11%] flex flex-col items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 px-6 sm:gap-2">
           {HERO.map((c, i) => (
             <motion.div
               key={c.id}
               initial={{ opacity: 0, y: -30, rotate: i % 2 ? 5 : -5 }}
               animate={{ opacity: 1, y: 0, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 20, delay: 0.15 + i * 0.09 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 20, delay: 0.5 + i * 0.09 }}
             >
-              <PlayingCard card={c} size="md" />
+              <PlayingCard card={c} size="sm" />
             </motion.div>
           ))}
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
+        <motion.span
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
-          className="mt-9 flex items-baseline justify-center gap-3"
+          transition={{ delay: 1.2, duration: 0.5 }}
+          className="font-mono text-2xl font-semibold tabular text-felt-ink"
         >
-          <span className="font-mono text-5xl font-semibold tabular tracking-tight text-big sm:text-6xl">20</span>
-          <span className="text-sm text-muted">exactly on target</span>
-        </motion.div>
+          = 20
+        </motion.span>
       </div>
-    </Panel>
+    </div>
   );
 }
 
@@ -268,7 +290,7 @@ function HowItPlays() {
           <CoinsIcon size={28} weight="duotone" className="text-accent" aria-hidden />
           <h3 className="mt-5 text-lg font-semibold tracking-tight">Three betting rounds</h3>
           <p className="mt-2 max-w-[44ch] text-[15px] leading-relaxed text-muted">
-            Bet before any cards, after two, and after four. Fold, check, call or raise, just like Hold&apos;em.
+            Bet before any cards, after two, and after four. Fold, check, call or raise, just like Hold’em.
           </p>
         </div>
 

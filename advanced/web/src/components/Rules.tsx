@@ -70,7 +70,7 @@ export function RulesSheet({ open, onClose }: { open: boolean; onClose: () => vo
             <li>Equations are revealed and the pot is paid out.</li>
           </ol>
           <p>
-            Betting works like Texas Hold&apos;em: fold, check or call, or raise. You can raise by at most the amount every other
+            Betting works like Texas Hold’em: fold, check or call, or raise. You can raise by at most the amount every other
             player can still match.
           </p>
         </Section>
@@ -105,7 +105,7 @@ export function RulesSheet({ open, onClose }: { open: boolean; onClose: () => vo
             <b className="font-medium text-small">Small</b> players compete for the closest to 1.{' '}
             <b className="font-medium text-big">Big</b> players compete for the closest to 20. If you bet{' '}
             <b className="font-medium text-ink">both</b>, you build two equations and must win both pools. If everyone picked the
-            same side, the closest takes the whole pot. With a mix, the small and big winners split it, and a &quot;both&quot; bettor
+            same side, the closest takes the whole pot. With a mix, the small and big winners split it, and a “both” bettor
             who wins only one pool loses that claim.
           </p>
           <p>

@@ -1,4 +1,4 @@
-export const chips = (n: number) => n.toLocaleString('en-US');
+export const chips = (n: number) => n.toLocaleString();
 
 /** 13.3333 / 20 / 0.25: whole numbers stay whole, others show up to 4 decimals */
 export function value(n: number): string {

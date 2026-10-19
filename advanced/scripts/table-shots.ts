@@ -65,7 +65,11 @@ async function main() {
   ];
   for (const bots of COUNTS) {
     for (const s of sizes) {
-      const ctx = await browser.newContext({ ...s, colorScheme: 'dark' });
+      const ctx = await browser.newContext({
+        ...s,
+        colorScheme: process.env.THEME === 'light' ? 'light' : 'dark',
+        reducedMotion: process.env.REDUCED ? 'reduce' : 'no-preference',
+      });
       const page = await ctx.newPage();
       page.on('console', (m) => m.type() === 'error' && errors.push(`[${s.tag}/${bots}] console: ${m.text()}`));
       page.on('pageerror', (e) => errors.push(`[${s.tag}/${bots}] pageerror: ${e.message}`));

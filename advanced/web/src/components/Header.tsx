@@ -71,7 +71,14 @@ export function Header({ view, onLeave }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-line bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+      <a
+        href="#main"
+        className="sr-only rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink focus:not-sr-only focus:absolute focus:left-4 focus:top-2"
+      >
+        Skip to the table
+      </a>
+      <h1 className="sr-only">Table {view.code}</h1>
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
           <span className="grid size-8 place-items-center rounded-full bg-accent text-accent-ink">

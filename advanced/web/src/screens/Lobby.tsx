@@ -1,11 +1,26 @@
 import { useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRightIcon, CopyIcon, CrownSimpleIcon, RobotIcon, ShareNetworkIcon, UserPlusIcon, XIcon } from '../lib/icons';
+import { ArrowRightIcon, CopyIcon, RobotIcon, ShareNetworkIcon } from '../lib/icons';
 import type { Command, RoomView } from '@numberpoker/shared';
 import { game } from '../lib/client';
 import { chips } from '../lib/format';
 import { Header } from '../components/Header';
-import { Avatar, Button, Panel, Sheet, useToast } from '../components/ui';
+import { PokerTable } from '../components/PokerTable';
+import { Button, Panel, Sheet, useToast } from '../components/ui';
+
+/** the table code, printed on the felt like the table's name */
+function CodeOnFelt({ view }: { view: RoomView }) {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center text-felt-ink">
+      <span className="text-[11px] text-felt-muted md:text-sm">Table code</span>
+      <span aria-label={`Table code ${view.code}`} className="mt-1 font-mono text-3xl font-semibold tracking-[0.22em] md:text-6xl">
+        {view.code}
+      </span>
+      <span className="mt-2 text-[11px] text-felt-muted md:text-sm">
+        {view.players.length} of {view.limits.maxPlayers} seated
+      </span>
+    </div>
+  );
+}
 
 export function Lobby({ view }: { view: RoomView }) {
   const toast = useToast();
@@ -15,8 +30,8 @@ export function Lobby({ view }: { view: RoomView }) {
   const host = view.players.find((p) => p.id === view.hostId);
   const link = `${location.origin}/room/${view.code}`;
   const canStart = view.players.length >= 2;
-  // two open seats are enough to say "there is room"; the heading carries the real count
-  const open = Array.from({ length: Math.min(2, Math.max(0, view.limits.maxPlayers - view.players.length)) });
+  // two open seats are enough to say "there is room"; the count under the code is exact
+  const open = Math.min(2, Math.max(0, view.limits.maxPlayers - view.players.length));
 
   async function run(key: string, cmd: Command) {
     setBusy(key);
@@ -49,19 +64,24 @@ export function Lobby({ view }: { view: RoomView }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header view={view} onLeave={() => setLeaving(true)} />
-      <main className="mx-auto grid w-full max-w-5xl flex-1 gap-6 px-4 py-8 lg:grid-cols-[1.15fr_0.85fr] lg:py-12">
-        <Panel innerClassName="p-5 md:p-8">
+      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-2 pb-12 pt-6 md:px-4">
+        <div className="px-3 text-center md:px-0">
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Your table is open</h1>
-          <p className="mt-2 max-w-[52ch] text-muted">Send the link or the code to your friends. They can join from any phone or laptop.</p>
+          <p className="mx-auto mt-2 max-w-[52ch] text-muted">Send the link or the code to your friends. They can join from any phone or laptop.</p>
+        </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div
-              aria-label={`Table code ${view.code}`}
-              className="rounded-2xl bg-surface-2 px-5 py-3 text-center font-mono text-4xl font-semibold tracking-[0.3em] ring-1 ring-line-strong"
-            >
-              {view.code}
-            </div>
-            <div className="flex gap-2">
+        <PokerTable
+          view={view}
+          centre={<CodeOnFelt view={view} />}
+          emptySeats={open}
+          onKick={isHost ? (id) => void run(`kick-${id}`, { type: 'kick', playerId: id }) : undefined}
+        />
+
+        <div className="mx-auto mt-8 grid max-w-3xl gap-5 px-1 md:grid-cols-[1fr_1fr] md:px-0">
+          <Panel className="h-full" innerClassName="h-full p-5 md:p-6">
+            <h2 className="text-lg font-semibold tracking-tight">Invite friends</h2>
+            <p className="mt-1 text-sm text-muted">Anyone with the link or the code can sit down.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={copy}>
                 <CopyIcon size={17} aria-hidden /> Copy link
               </Button>
@@ -69,67 +89,15 @@ export function Lobby({ view }: { view: RoomView }) {
                 <ShareNetworkIcon size={17} aria-hidden /> Share
               </Button>
             </div>
-          </div>
+            <p className="mt-4 text-xs text-faint">
+              Everyone starts with {chips(view.limits.startingChips)} chips. The match ends when one player holds every chip.
+            </p>
+          </Panel>
 
-          <h2 className="mb-3 mt-9 text-sm font-semibold text-muted">
-            Seats ({view.players.length} of {view.limits.maxPlayers})
-          </h2>
-          <ul className="grid gap-2.5 sm:grid-cols-2">
-            {view.players.map((p, i) => (
-              <motion.li
-                key={p.id}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 24, delay: i * 0.04 }}
-                className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 ring-1 ring-line"
-              >
-                <Avatar name={p.name} bot={p.isBot} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate font-semibold tracking-tight">{p.name}</span>
-                    {p.id === view.you && <span className="text-xs text-muted">(you)</span>}
-                    {p.isHost && <CrownSimpleIcon size={14} weight="fill" className="text-muted" aria-label="Host" />}
-                  </div>
-                  <div className="text-xs text-muted">
-                    {p.isBot ? 'Bot' : p.connected ? 'Ready' : 'Reconnecting...'}
-                  </div>
-                </div>
-                {isHost && p.id !== view.you && (
-                  <button
-                    aria-label={`Remove ${p.name}`}
-                    onClick={() => run(`kick-${p.id}`, { type: 'kick', playerId: p.id })}
-                    className="grid size-9 place-items-center rounded-full text-muted hover:bg-ink/10 hover:text-ink"
-                  >
-                    <XIcon size={16} />
-                  </button>
-                )}
-              </motion.li>
-            ))}
-            {open.map((_, i) => (
-              <li
-                key={`open-${i}`}
-                className="flex items-center gap-3 rounded-2xl border border-dashed border-line-strong p-3 text-sm text-faint"
-              >
-                <span className="grid size-10 place-items-center rounded-full border border-dashed border-line-strong">
-                  <UserPlusIcon size={16} aria-hidden />
-                </span>
-                Open seat
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
-        <div className="flex flex-col gap-6">
-          <Panel innerClassName="p-5 md:p-7">
-            <h2 className="text-xl font-semibold tracking-tight">{isHost ? 'Ready when you are' : `Waiting for ${host?.name ?? 'the host'}`}</h2>
-            <ul className="mt-4 space-y-2.5 text-[15px] text-muted">
-              <li>Everyone starts with {chips(view.limits.startingChips)} chips.</li>
-              <li>Three betting rounds, then each player builds an equation.</li>
-              <li>The match ends when one player holds every chip.</li>
-            </ul>
-
+          <Panel className="h-full" innerClassName="h-full p-5 md:p-6">
+            <h2 className="text-lg font-semibold tracking-tight">{isHost ? 'Ready when you are' : `Waiting for ${host?.name ?? 'the host'}`}</h2>
             {isHost ? (
-              <div className="mt-6 space-y-3">
+              <div className="mt-4 space-y-3">
                 <Button
                   variant="primary"
                   size="lg"
@@ -150,9 +118,10 @@ export function Lobby({ view }: { view: RoomView }) {
                 >
                   <RobotIcon size={18} aria-hidden /> Add a bot
                 </Button>
+                <p className="text-xs text-faint">Tap a player at the table to remove them.</p>
               </div>
             ) : (
-              <p className="mt-6 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted" role="status">
+              <p className="mt-4 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted" role="status">
                 The host will start the game once everyone is here.
               </p>
             )}

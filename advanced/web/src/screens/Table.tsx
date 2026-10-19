@@ -64,7 +64,7 @@ export function Table({ view }: { view: RoomView }) {
     <div className="flex min-h-dvh flex-col">
       <Header view={view} onLeave={() => setLeaving(true)} />
 
-      <main className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-2 pt-4 md:gap-5 md:px-4 ${dockVisible ? 'pb-44' : 'pb-10'}`}>
+      <main id="main" className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-2 pt-4 md:gap-5 md:px-4 ${dockVisible ? 'pb-44' : 'pb-10'}`}>
         {view.isSpectator && (
           <div className="mx-2 flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted ring-1 ring-line md:mx-0">
             <EyeIcon size={18} aria-hidden />

@@ -59,8 +59,8 @@ export function portraitAspect(seats: number): string {
 export function landscapeAspect(seats: number): string {
   if (seats <= 3) return '2.3 / 1';
   if (seats <= 5) return '2 / 1';
-  if (seats <= 7) return '1.75 / 1';
-  return '1.55 / 1';
+  if (seats <= 7) return '1.7 / 1';
+  return '1.38 / 1';
 }
 
 /** move a point a fraction of the way towards the table centre (where bets are placed) */

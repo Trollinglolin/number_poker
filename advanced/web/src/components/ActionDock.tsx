@@ -5,6 +5,8 @@ import type { Command, PlayerView, RoomView } from '@numberpoker/shared';
 import { chips, cn } from '../lib/format';
 import { Button } from './ui';
 import { PlayingCard } from './cards';
+import { ChipButton, ChipStack } from './Chips';
+import type { Denom } from '../lib/chipMath';
 
 interface Props {
   view: RoomView;
@@ -63,7 +65,7 @@ function Waiting({ view }: { view: RoomView }) {
   const who = view.players.find((p) => p.id === view.turn)?.name;
   return (
     <p className="px-2 py-2.5 text-center text-sm text-muted" role="status">
-      {who ? `Waiting for ${who} to act...` : 'Waiting for the table...'}
+      {who ? `Waiting for ${who} to act…` : 'Waiting for the table…'}
     </p>
   );
 }
@@ -88,11 +90,11 @@ function BetControls({ view, send }: Props) {
   }
 
   const clamp = (n: number) => Math.min(b.maxRaise, Math.max(1, Math.round(n || 1)));
-  const presets: { label: string; value: number }[] = [
-    { label: 'Min', value: 1 },
-    { label: 'Half pot', value: Math.round(view.pot / 2) },
-    { label: 'Pot', value: view.pot },
-    { label: 'Max', value: b.maxRaise },
+  const presets: { label: string; short: string; denom: Denom; value: number }[] = [
+    { label: 'Minimum raise', short: 'Min', denom: 1, value: 1 },
+    { label: 'Half the pot', short: '1/2', denom: 5, value: Math.round(view.pot / 2) },
+    { label: 'The pot', short: 'Pot', denom: 25, value: view.pot },
+    { label: 'All the chips you can raise', short: 'Max', denom: 100, value: b.maxRaise },
   ];
 
   return (
@@ -146,24 +148,25 @@ function BetControls({ view, send }: Props) {
                 className="w-full"
               />
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center justify-center gap-3 pt-1" role="group" aria-label="Quick bets">
               {presets.map((p) => (
-                <button
+                <ChipButton
                   key={p.label}
+                  denom={p.denom}
+                  label={p.short}
+                  ariaLabel={p.label}
+                  selected={amount === clamp(p.value)}
                   onClick={() => setAmount(clamp(p.value))}
-                  className={cn(
-                    'h-8 rounded-full px-3.5 text-xs font-medium ring-1 transition-colors',
-                    amount === clamp(p.value) ? 'bg-ink text-bg ring-ink' : 'bg-surface-3 text-muted ring-line-strong hover:text-ink',
-                  )}
-                >
-                  {p.label}
-                </button>
+                />
               ))}
             </div>
-            <p className="text-xs text-muted">
-              You put in <span className="font-mono text-ink">{chips(b.callAmount + amount)}</span>. The bet to match becomes{' '}
-              <span className="font-mono text-ink">{chips(view.currentBet + amount)}</span>.
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">
+                You put in <span className="font-mono text-ink">{chips(b.callAmount + amount)}</span>. The bet to match becomes{' '}
+                <span className="font-mono text-ink">{chips(view.currentBet + amount)}</span>.
+              </p>
+              <ChipStack amount={b.callAmount + amount} size="sm" label={false} className="shrink-0" />
+            </div>
             <Button
               variant="primary"
               className="w-full"

@@ -25,7 +25,7 @@ async function main() {
     await page.getByLabel('Your name').fill('Ada');
     await page.getByRole('button', { name: /Create a table/ }).click();
     await page.getByRole('heading', { name: 'Your table is open' }).waitFor();
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < Number(process.env.BOTS ?? 3); i++) {
       await page.getByRole('button', { name: /Add a bot/ }).click();
       await page.waitForTimeout(150);
     }
@@ -37,6 +37,11 @@ async function main() {
     await page.screenshot({ path: `${OUT}/${s.tag}-bets-1.png` });
     await page.waitForTimeout(2600);
     await page.screenshot({ path: `${OUT}/${s.tag}-bets-2.png` });
+    // with many bots the calls keep arriving; capture the table as the piles fill up
+    await page.waitForTimeout(3000);
+    await page.screenshot({ path: `${OUT}/${s.tag}-bets-3.png` });
+    await page.waitForTimeout(2000);
+    await page.screenshot({ path: `${OUT}/${s.tag}-bets-4.png` });
     await ctx.close();
   }
   await browser.close();

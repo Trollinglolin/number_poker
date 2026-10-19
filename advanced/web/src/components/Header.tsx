@@ -78,7 +78,8 @@ export function Header({ view, onLeave }: HeaderProps) {
       >
         Skip to the table
       </a>
-      <h1 className="sr-only">Table {view.code}</h1>
+      {/* the lobby has its own visible h1 */}
+      {view.phase !== 'waiting' && <h1 className="sr-only">Table {view.code}</h1>}
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
           <span className="grid size-8 place-items-center rounded-full bg-accent text-accent-ink">

@@ -10,7 +10,8 @@ import { headline } from '../lib/headline';
 import { CoinsIcon, CrownSimpleIcon, UserPlusIcon, WifiSlashIcon } from '../lib/icons';
 import { useMedia } from '../lib/useMedia';
 import { AnimatedNumber } from './AnimatedNumber';
-import { ChipStack } from './Chips';
+import { Chip, ChipStack } from './Chips';
+import { chipBreakdown } from '../lib/chipMath';
 import { PlayingCard } from './cards';
 import { Avatar, Button, Sheet } from './ui';
 
@@ -118,7 +119,7 @@ function SeatPlate({
     <div className="flex flex-col items-center">
       <button
         onClick={() => onOpen(p.id)}
-        aria-label={`${p.name}${hero ? ' (you)' : ''}, ${chips(p.chips)} chips, ${status.text.trim() || 'waiting'}. Show cards.`}
+        aria-label={`${p.name}${hero ? ' (you)' : ''}, ${chips(p.chips)} chips${p.bet > 0 && !p.folded ? `, bet ${chips(p.bet)}` : ''}, ${status.text.trim() || 'waiting'}. Show cards.`}
         className={cn(
           'plate relative w-[78px] rounded-xl px-1 pb-1 pt-[22px] text-center transition-[box-shadow,transform] duration-500 ease-out-expo hover:-translate-y-0.5 md:w-[140px] md:rounded-2xl md:px-1.5 md:pb-1.5 md:pt-[28px]',
           out && 'opacity-60',
@@ -138,6 +139,13 @@ function SeatPlate({
           {!p.connected && !p.isBot && !out && <WifiSlashIcon size={11} aria-hidden />}
           {status.text}
         </span>
+        {/* phones: the bet is a small pill inside the plate, so nothing floats over the cramped table */}
+        {BETTING_PHASES.includes(view.phase) && p.bet > 0 && !p.folded && (
+          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-black/45 py-0.5 pl-1 pr-2 font-mono text-[11px] font-semibold tabular md:hidden" aria-hidden>
+            <Chip denom={chipBreakdown(p.bet)[0]?.denom ?? 1} size="xs" />
+            {chips(p.bet)}
+          </span>
+        )}
         {won > 0 && (
           <span className="absolute -right-2 -top-3 rounded-full bg-felt-accent px-2 py-0.5 font-mono text-xs font-semibold tabular text-felt-accent-ink shadow-lg">
             +{chips(won)}
@@ -283,6 +291,8 @@ export function PokerTable({ view, centre, emptySeats = 0, onKick }: Props) {
   const betting = BETTING_PHASES.includes(view.phase);
   const round = view.phase === 'preflop' ? 0 : view.phase === 'betting1' ? 1 : 2;
   const winners = view.phase === 'ended' && view.result ? Object.entries(view.result.payouts).filter(([, amount]) => amount > 0) : [];
+  // the table remounts after the equation round; cards that were already dealt must not be "dealt" again
+  const dealing = betting || view.phase === 'dealing1' || view.phase === 'dealing2';
 
   return (
     <div
@@ -294,8 +304,8 @@ export function PokerTable({ view, centre, emptySeats = 0, onKick }: Props) {
       <div aria-hidden className="felt absolute inset-3 rounded-[50%] md:inset-7" />
       {centre ?? <Centre view={view} />}
 
-      {/* bets: chips in front of each seat, swept into the pot when the round closes */}
-      <div className="pointer-events-none absolute inset-0">
+      {/* bets on larger screens: chips in front of each seat, swept into the pot when the round closes */}
+      <div className="pointer-events-none absolute inset-0 hidden md:block" aria-hidden>
         <AnimatePresence>
           {betting &&
             view.players
@@ -332,7 +342,7 @@ export function PokerTable({ view, centre, emptySeats = 0, onKick }: Props) {
         )}
         {others.map((p, i) => (
           <li key={p.id} className={seatClass} style={place(slots[i])}>
-            <SeatPlate p={p} view={view} onOpen={setOpen} dealFrom={flights ? vec(at(slots[i]), CENTRE) : null} />
+            <SeatPlate p={p} view={view} onOpen={setOpen} dealFrom={flights && dealing ? vec(at(slots[i]), CENTRE) : null} />
           </li>
         ))}
         {Array.from({ length: emptySeats }).map((_, i) => (

@@ -13,7 +13,7 @@ const LOOK: Record<Denom, { body: string; ink: string }> = {
   1000: { body: '#d6b049', ink: '#2e2406' },
 };
 
-const SIZE = { sm: 22, md: 30, lg: 38 } as const;
+const SIZE = { xs: 14, sm: 22, md: 30, lg: 38 } as const;
 type ChipSize = keyof typeof SIZE;
 
 /** one chip seen from above: coloured body, edge spots, inner ring and its value */
@@ -79,7 +79,7 @@ export function ChipStack({
 }) {
   const piles = chipBreakdown(amount);
   if (amount <= 0) return null;
-  const lift = size === 'sm' ? 3 : size === 'md' ? 4 : 5;
+  const lift = size === 'xs' ? 2 : size === 'sm' ? 3 : size === 'md' ? 4 : 5;
   return (
     <span className={cn('inline-flex items-end gap-1.5', className)}>
       <span className="inline-flex items-end gap-0.5" aria-hidden>

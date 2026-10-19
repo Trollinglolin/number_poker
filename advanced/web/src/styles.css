@@ -208,6 +208,23 @@ summary {
   }
 }
 
+/*
+ * One-screen desktop layout: the parent has a definite height (a flex child with min-height 0);
+ * the table takes the largest size of its own aspect ratio that fits. The padding on top leaves room
+ * for the avatar that sits above the top seat.
+ */
+.fit-parent {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding-top: 26px;
+}
+.table-fit {
+  width: min(100cqw, calc(100cqh * var(--dr, 2)), 1180px);
+  aspect-ratio: var(--dr, 2);
+}
+
 .rail {
   background: linear-gradient(165deg, #333d38 0%, #18201c 50%, #0b0f0d 100%);
   box-shadow:

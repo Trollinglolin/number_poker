@@ -21,7 +21,7 @@ interface Props {
   send: (c: Command) => Promise<boolean>;
 }
 
-export function EquationBuilder({ me, send }: Props) {
+export function EquationBuilder({ me, send, wide = false }: Props & { wide?: boolean }) {
   const toast = useToast();
   const hand = useMemo<Card[]>(() => [...(me.cards.filter((c) => c.kind !== 'hidden') as Card[]), ...me.ops], [me.cards, me.ops]);
   const [betType, setBetType] = useState<BetType | null>(null);
@@ -68,16 +68,16 @@ export function EquationBuilder({ me, send }: Props) {
   }
 
   return (
-    <Panel innerClassName="p-4 md:p-6">
+    <Panel innerClassName={wide ? "p-4" : "p-4 md:p-6"}>
       <div className="mb-1 flex items-baseline justify-between gap-3">
         <h2 className="text-xl font-semibold tracking-tight">Build your equation</h2>
         <span className="text-sm text-muted">Use all {hand.length} cards</span>
       </div>
-      <p className="max-w-[60ch] text-sm text-muted">
+      <p className={wide ? "sr-only" : "max-w-[60ch] text-sm text-muted"}>
         Pick what you are going for, then tap your cards in order. Drag to reorder, tap a placed card to take it back.
       </p>
 
-      <div role="radiogroup" aria-label="What are you betting on?" className="mt-5 grid grid-cols-3 gap-2.5">
+      <div role="radiogroup" aria-label="What are you betting on?" className="mt-3 grid grid-cols-3 gap-2.5">
         {OPTIONS.map((o) => {
           const on = betType === o.id;
           return (
@@ -87,26 +87,30 @@ export function EquationBuilder({ me, send }: Props) {
               aria-checked={on}
               onClick={() => setBetType(o.id)}
               className={cn(
-                'rounded-2xl p-3 text-left ring-1 transition-[background-color,box-shadow,transform] duration-500 ease-out-expo active:scale-[0.98]',
+                'rounded-2xl text-left ring-1 transition-[background-color,box-shadow,transform] duration-500 ease-out-expo active:scale-[0.98]',
+                wide ? 'flex items-center gap-3 px-3 py-2' : 'p-3',
                 on ? 'bg-surface-3 ring-2 ring-accent' : 'bg-surface-2 ring-line-strong hover:bg-surface-3',
               )}
             >
               <div
                 className={cn(
-                  'font-mono text-xl font-semibold tabular',
+                  'font-mono font-semibold tabular',
+                  wide ? 'text-lg' : 'text-xl',
                   o.id === 'small' ? 'text-small' : o.id === 'big' ? 'text-big' : 'text-ink',
                 )}
               >
                 {o.glyph}
               </div>
-              <div className="mt-1.5 text-sm font-semibold leading-tight">{o.title}</div>
-              <div className="text-xs leading-snug text-muted">{o.hint}</div>
+              <div>
+                <div className={cn('text-sm font-semibold leading-tight', !wide && 'mt-1.5')}>{o.title}</div>
+                <div className="text-xs leading-snug text-muted">{o.hint}</div>
+              </div>
             </button>
           );
         })}
       </div>
 
-      <div className="mt-5 space-y-6">
+      <div className={wide && betType === "both" ? "mt-4 grid grid-cols-2 gap-5" : "mt-4 space-y-6"}>
         {betType === null && (
           <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
             Choose small, big or both to start building.

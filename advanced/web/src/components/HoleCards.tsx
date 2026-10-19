@@ -16,7 +16,7 @@ function Deal({ index, rotate, children }: { index: number; rotate: number; chil
 }
 
 /** my cards, held in front of me under the table */
-export function HoleCards({ me, view }: { me: PlayerView; view: RoomView }) {
+export function HoleCards({ me, view, row = false }: { me: PlayerView; view: RoomView; row?: boolean }) {
   const numbers = me.cards.filter((c) => c.kind === 'number');
   const extras = me.cards.filter((c) => c.kind === 'op');
   const out = me.folded || me.eliminated;
@@ -30,6 +30,34 @@ export function HoleCards({ me, view }: { me: PlayerView; view: RoomView }) {
           ? 'You were away, so you are sitting this hand out.'
           : 'You folded this hand.'
       : null;
+
+  // one compact row for a desktop screen: number cards and operation cards side by side
+  if (row) {
+    return (
+      <section aria-label="Your hand" className={cn('flex flex-wrap items-end justify-center gap-x-6 gap-y-2', out && 'opacity-60')}>
+        {note && <p className="w-full rounded-full bg-surface-2 px-4 py-1.5 text-center text-sm text-muted ring-1 ring-line">{note}</p>}
+        {numbers.length > 0 ? (
+          <div className="flex items-end -space-x-1 pt-1.5" aria-label="Your number cards" role="group" title="The card marked with the eye is hidden from the other players">
+            {numbers.map((c, i) => (
+              <Deal key={c.id} index={i} rotate={(i - (numbers.length - 1) / 2) * 3}>
+                <PlayingCard card={c} size="md" />
+              </Deal>
+            ))}
+          </div>
+        ) : (
+          <p className="self-center rounded-2xl border border-dashed border-line-strong px-5 py-3 text-sm text-muted">Number cards arrive after the first betting round.</p>
+        )}
+        <span aria-hidden className="hidden h-16 w-px self-center bg-line-strong sm:block" />
+        <div className="flex items-end gap-2" aria-label="Your operations" role="group">
+          {[...extras, ...me.ops].map((c, i) => (
+            <Deal key={c.id} index={i + numbers.length} rotate={0}>
+              <PlayingCard card={c} size="md" />
+            </Deal>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-label="Your hand" className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4">

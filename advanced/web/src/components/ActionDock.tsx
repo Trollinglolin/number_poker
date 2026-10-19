@@ -13,19 +13,36 @@ interface Props {
   send: (c: Command) => Promise<boolean>;
 }
 
+/** what the player can do right now: bet controls, a waiting note, or "deal next hand"; null if nothing */
+export function actionBody(view: RoomView, send: Props['send'], stacked: boolean): React.ReactNode {
+  const me = view.players.find((p) => p.id === view.you);
+  if (!me) return null;
+  const betting = view.phase === 'preflop' || view.phase === 'betting1' || view.phase === 'betting2';
+  const inHand = !me.folded && !me.eliminated;
+  if (view.phase === 'ended') return <NextHand view={view} send={send} />;
+  if (betting && inHand) {
+    return view.betting && view.turn === me.id ? <BetControls view={view} send={send} stacked={stacked} /> : <Waiting view={view} />;
+  }
+  return null;
+}
+
+/** the desktop side panel version of the controls (the phone dock below is not rendered there) */
+export function ActionPanel({ view, send }: Props) {
+  const body = actionBody(view, send, true);
+  if (!body) return null;
+  return (
+    <section aria-label="Your move" className="rounded-3xl bg-surface p-4 ring-1 ring-line-strong shadow-[var(--shadow)]">
+      {body}
+    </section>
+  );
+}
+
 /** fixed to the bottom of the screen: betting controls, or the "deal next hand" button */
 export function ActionDock({ view, send }: Props) {
   const me = view.players.find((p) => p.id === view.you);
   if (!me) return null;
-
-  const betting = view.phase === 'preflop' || view.phase === 'betting1' || view.phase === 'betting2';
   const inHand = !me.folded && !me.eliminated;
-
-  let body: React.ReactNode = null;
-  if (view.phase === 'ended') body = <NextHand view={view} send={send} />;
-  else if (betting && inHand) {
-    body = view.betting && view.turn === me.id ? <BetControls view={view} send={send} /> : <Waiting view={view} />;
-  }
+  const body = actionBody(view, send, false);
   if (!body) return null;
 
   return (
@@ -70,7 +87,7 @@ function Waiting({ view }: { view: RoomView }) {
   );
 }
 
-function BetControls({ view, send }: Props) {
+function BetControls({ view, send, stacked = false }: Props & { stacked?: boolean }) {
   const b = view.betting!;
   const [raising, setRaising] = useState(false);
   const [amount, setAmount] = useState(1);
@@ -80,7 +97,7 @@ function BetControls({ view, send }: Props) {
   // a new turn starts with the controls closed
   useEffect(() => {
     setRaising(false);
-    setAmount(Math.min(Math.max(1, Math.round(view.pot / 2)), Math.max(1, b.maxRaise)));
+    setAmount(Math.min(Math.max(b.minRaise, Math.round(view.pot / 2)), Math.max(b.minRaise, b.maxRaise)));
   }, [view.turn, view.phase, view.currentBet, view.pot, b.maxRaise]);
 
   async function run(key: string, cmd: Command) {
@@ -89,9 +106,9 @@ function BetControls({ view, send }: Props) {
     setBusy(null);
   }
 
-  const clamp = (n: number) => Math.min(b.maxRaise, Math.max(1, Math.round(n || 1)));
+  const clamp = (n: number) => Math.min(b.maxRaise, Math.max(b.minRaise, Math.round(n || b.minRaise)));
   const presets: { label: string; short: string; denom: Denom; value: number }[] = [
-    { label: 'Minimum raise', short: 'Min', denom: 1, value: 1 },
+    { label: 'Minimum raise', short: 'Min', denom: 1, value: b.minRaise },
     { label: 'Half the pot', short: '1/2', denom: 5, value: Math.round(view.pot / 2) },
     { label: 'The pot', short: 'Pot', denom: 25, value: view.pot },
     { label: 'All the chips you can raise', short: 'Max', denom: 100, value: b.maxRaise },
@@ -137,11 +154,11 @@ function BetControls({ view, send }: Props) {
                 <PlusIcon size={16} />
               </button>
             </div>
-            {b.maxRaise > 1 && (
+            {b.maxRaise > b.minRaise && (
               <input
                 aria-label="Raise amount"
                 type="range"
-                min={1}
+                min={b.minRaise}
                 max={b.maxRaise}
                 value={amount}
                 onChange={(e) => setAmount(clamp(Number(e.target.value)))}
@@ -180,13 +197,19 @@ function BetControls({ view, send }: Props) {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center gap-2">
-        <Button variant="danger" className="flex-none" loading={busy === 'fold'} onClick={() => run('fold', { type: 'fold' })}>
+      <div className={stacked ? 'grid grid-cols-2 gap-2' : 'flex items-center gap-2'}>
+        <Button
+          variant="danger"
+          className={stacked ? 'w-full' : 'flex-none'}
+          loading={busy === 'fold'}
+          onClick={() => run('fold', { type: 'fold' })}
+        >
           <ProhibitIcon size={17} aria-hidden /> Fold
         </Button>
         <Button
           variant="primary"
-          className="min-w-0 flex-1"
+          className={stacked ? 'order-first col-span-2 w-full justify-between' : 'min-w-0 flex-1'}
+          size={stacked ? 'lg' : 'md'}
           loading={busy === 'call'}
           onClick={() => run('call', { type: 'call' })}
           island={<HandshakeIcon size={16} weight="fill" />}
@@ -195,7 +218,7 @@ function BetControls({ view, send }: Props) {
         </Button>
         <Button
           variant="secondary"
-          className="flex-none"
+          className={stacked ? 'w-full' : 'flex-none'}
           disabled={!canRaise}
           aria-expanded={raising}
           title={canRaise ? undefined : 'Nobody can be raised further right now'}

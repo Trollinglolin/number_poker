@@ -4,6 +4,7 @@ import type { Command, RoomView } from '@numberpoker/shared';
 import { game } from '../lib/client';
 import { chips } from '../lib/format';
 import { Header } from '../components/Header';
+import { useMedia } from '../lib/useMedia';
 import { PokerTable } from '../components/PokerTable';
 import { Button, Panel, Sheet, useToast } from '../components/ui';
 
@@ -26,6 +27,8 @@ export function Lobby({ view }: { view: RoomView }) {
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  // a normal computer screen gets one fixed-height screen: the table fitted on the left, the panels beside it
+  const wide = useMedia('(min-width: 1024px)');
   const isHost = view.hostId === view.you;
   const host = view.players.find((p) => p.id === view.hostId);
   const link = `${location.origin}/room/${view.code}`;
@@ -61,23 +64,40 @@ export function Lobby({ view }: { view: RoomView }) {
     copy();
   }
 
+  const intro = (
+    <div className={wide ? 'px-1' : 'px-3 text-center md:px-0'}>
+      <h1 className={wide ? 'text-2xl font-semibold tracking-tight' : 'text-3xl font-semibold tracking-tight md:text-4xl'}>Your table is open</h1>
+      <p className={wide ? 'mt-1 text-sm text-muted' : 'mx-auto mt-2 max-w-[52ch] text-muted'}>
+        Send the link or the code to your friends. They can join from any phone or laptop.
+      </p>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className={wide ? 'flex h-dvh flex-col overflow-hidden' : 'flex min-h-dvh flex-col'}>
       <Header view={view} onLeave={() => setLeaving(true)} />
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-2 pb-12 pt-6 md:px-4">
-        <div className="px-3 text-center md:px-0">
-          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Your table is open</h1>
-          <p className="mx-auto mt-2 max-w-[52ch] text-muted">Send the link or the code to your friends. They can join from any phone or laptop.</p>
+      <main
+        id="main"
+        className={
+          wide
+            ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] grid-rows-[minmax(0,1fr)] gap-5 px-5 pb-4 pt-1'
+            : 'mx-auto w-full max-w-5xl flex-1 px-2 pb-12 pt-6 md:px-4'
+        }
+      >
+        {!wide && intro}
+
+        <div className={wide ? 'fit-parent' : undefined}>
+          <PokerTable
+            view={view}
+            fit={wide}
+            centre={<CodeOnFelt view={view} />}
+            emptySeats={open}
+            onKick={isHost ? (id) => void run(`kick-${id}`, { type: 'kick', playerId: id }) : undefined}
+          />
         </div>
 
-        <PokerTable
-          view={view}
-          centre={<CodeOnFelt view={view} />}
-          emptySeats={open}
-          onKick={isHost ? (id) => void run(`kick-${id}`, { type: 'kick', playerId: id }) : undefined}
-        />
-
-        <div className="mx-auto mt-8 grid max-w-3xl gap-5 px-1 md:grid-cols-[1fr_1fr] md:px-0">
+        <div className={wide ? 'flex min-h-0 flex-col gap-3 overflow-y-auto px-0.5 pt-1' : 'mx-auto mt-8 grid max-w-3xl gap-5 px-1 md:grid-cols-[1fr_1fr] md:px-0'}>
+          {wide && intro}
           <Panel className="h-full" innerClassName="h-full p-5 md:p-6">
             <h2 className="text-lg font-semibold tracking-tight">Invite friends</h2>
             <p className="mt-1 text-sm text-muted">Anyone with the link or the code can sit down.</p>

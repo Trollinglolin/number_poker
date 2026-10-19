@@ -56,12 +56,14 @@ export function portraitAspect(seats: number): string {
   return '3 / 5.3';
 }
 
-export function landscapeAspect(seats: number): string {
-  if (seats <= 3) return '2.3 / 1';
-  if (seats <= 5) return '2 / 1';
-  if (seats <= 7) return '1.7 / 1';
-  return '1.38 / 1';
+export function landscapeRatio(seats: number): number {
+  if (seats <= 3) return 2.3;
+  if (seats <= 5) return 2;
+  if (seats <= 7) return 1.7;
+  return 1.38;
 }
+
+export const landscapeAspect = (seats: number): string => `${landscapeRatio(seats)} / 1`;
 
 /** move a point a fraction of the way towards the table centre (where bets are placed) */
 export const towardCentre = (p: Point, t: number): Point => ({ x: p.x + (50 - p.x) * t, y: p.y + (50 - p.y) * t });

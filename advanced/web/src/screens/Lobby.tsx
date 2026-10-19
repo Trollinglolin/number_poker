@@ -15,7 +15,8 @@ export function Lobby({ view }: { view: RoomView }) {
   const host = view.players.find((p) => p.id === view.hostId);
   const link = `${location.origin}/room/${view.code}`;
   const canStart = view.players.length >= 2;
-  const open = Array.from({ length: Math.max(0, view.limits.maxPlayers - view.players.length) });
+  // two open seats are enough to say "there is room"; the heading carries the real count
+  const open = Array.from({ length: Math.min(2, Math.max(0, view.limits.maxPlayers - view.players.length)) });
 
   async function run(key: string, cmd: Command) {
     setBusy(key);

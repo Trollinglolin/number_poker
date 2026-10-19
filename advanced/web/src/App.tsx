@@ -30,6 +30,12 @@ function Screen() {
     }
   }, [state.view]);
 
+  // a new screen should start at the top, not wherever the last one was scrolled to
+  const screen = !state.view ? 'home' : state.view.phase === 'waiting' ? 'lobby' : 'table';
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [screen]);
+
   let body: React.ReactNode;
   if (state.view) body = state.view.phase === 'waiting' ? <Lobby view={state.view} /> : <Table view={state.view} />;
   else if (state.resuming) body = <Resuming />;

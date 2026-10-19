@@ -54,7 +54,17 @@ async function play(page: Page, tag: string) {
   await page.waitForTimeout(400);
   await shot('01-home', true);
 
-  await page.getByRole('button', { name: /Practice against a bot/ }).click();
+  // the lobby flow: create a table, look at it and the rules, add a bot, start
+  await page.getByRole('button', { name: /Create a table/ }).click();
+  await page.getByRole('heading', { name: 'Your table is open' }).waitFor();
+  await page.waitForTimeout(600);
+  await shot('01b-lobby', true);
+  await page.getByRole('button', { name: 'How to play' }).click();
+  await page.waitForTimeout(700);
+  await shot('01c-rules');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /Add a bot/ }).click();
+  await page.getByRole('button', { name: /Start game/ }).click();
   let shotBet = false;
   let shotSwap = false;
   let shotEq = false;

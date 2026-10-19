@@ -44,3 +44,7 @@ yarn-error.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Claude Code personal settings (shared config in .claude/ stays tracked)
+.claude/
+CLAUDE.md

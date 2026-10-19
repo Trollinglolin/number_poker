@@ -1,4 +1,15 @@
-import { MAX_PLAYERS, MIN_PLAYERS, STARTING_CHIPS, baseOps, createDeck, isNumber, isOp, numberCards } from './cards';
+import {
+  BIG_BLIND,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  SMALL_BLIND,
+  STARTING_CHIPS,
+  baseOps,
+  createDeck,
+  isNumber,
+  isOp,
+  numberCards,
+} from './cards';
 import { hasValidEquation, validateEquation } from './equation';
 import { settle } from './settle';
 import type { Contender } from './settle';
@@ -56,6 +67,10 @@ export function createRoom(code: string, host: { id: string; name: string }, rng
     code,
     hostId: host.id,
     phase: 'waiting',
+    dealerId: null,
+    smallBlindId: null,
+    bigBlindId: null,
+    blinds: { small: SMALL_BLIND, big: BIG_BLIND },
     hand: 0,
     seats: [],
     spectators: [],
@@ -97,6 +112,11 @@ export function removePlayer(room: Room, id: string) {
     return;
   }
   if (room.phase === 'waiting' || room.phase === 'ended') {
+    if (room.dealerId === id) {
+      // the button steps back one seat, so the next hand's dealer is the seat that followed the leaver
+      const i = room.seats.findIndex((s) => s.id === id);
+      room.dealerId = room.seats.length > 1 ? room.seats[(i - 1 + room.seats.length) % room.seats.length].id : null;
+    }
     room.seats = room.seats.filter((s) => s.id !== id);
     log(room, `${seat.name} left the table.`, id);
     reassignHost(room);
@@ -142,6 +162,10 @@ export function resetMatch(room: Room) {
   room.hand = 0;
   room.pot = 0;
   room.currentBet = 0;
+  room.dealerId = null;
+  room.smallBlindId = null;
+  room.bigBlindId = null;
+  room.blinds = { small: SMALL_BLIND, big: BIG_BLIND };
   room.turn = null;
   room.pendingSwap = null;
   room.result = null;
@@ -154,14 +178,41 @@ export function resetMatch(room: Room) {
 export function startHand(room: Room) {
   if (room.phase !== 'waiting' && room.phase !== 'ended') throw new GameError('A hand is already in progress.');
   if (room.matchWinnerId) throw new GameError('The match is over. Reset chips to play again.');
+  // remember the seating order before anyone is removed, so the button can move on from a seat that is gone
+  const seatOrder = room.seats.map((s) => s.id);
   room.seats = room.seats.filter((s) => !s.left);
   reassignHost(room);
   for (const s of room.seats) if (s.chips <= 0) s.eliminated = true;
   // someone who is disconnected when the hand starts sits it out instead of stalling the table
   const present = (s: Seat) => !s.eliminated && (s.isBot || s.connected);
-  if (room.seats.filter(present).length < MIN_PLAYERS) {
+  const playing = room.seats.filter(present);
+  if (playing.length < MIN_PLAYERS) {
     throw new GameError('At least two players with chips are needed.');
   }
+
+  // the dealer button moves to the next seated player after its old position
+  const playingIds = new Set(playing.map((s) => s.id));
+  const from = room.dealerId ? seatOrder.indexOf(room.dealerId) : -1;
+  let dealer = playing[0];
+  if (from !== -1) {
+    for (let i = 1; i <= seatOrder.length; i++) {
+      const id = seatOrder[(from + i) % seatOrder.length];
+      if (playingIds.has(id)) {
+        dealer = playing.find((s) => s.id === id)!;
+        break;
+      }
+    }
+  }
+  const d = playing.indexOf(dealer);
+  // heads-up the dealer posts the small blind; otherwise the two seats after the button post
+  const headsUp = playing.length === 2;
+  const sbSeat = headsUp ? dealer : playing[(d + 1) % playing.length];
+  const bbSeat = headsUp ? playing[(d + 1) % 2] : playing[(d + 2) % playing.length];
+
+  // blinds shrink to the shortest stack so everyone can post in full and no side pot is ever needed
+  const shortest = Math.min(...playing.map((s) => s.chips));
+  const big = Math.min(BIG_BLIND, shortest);
+  const small = Math.min(SMALL_BLIND, Math.floor(big / 2));
 
   room.deck = createDeck(room.rng);
   room.hand += 1;
@@ -170,6 +221,10 @@ export function startHand(room: Room) {
   room.turn = null;
   room.pendingSwap = null;
   room.result = null;
+  room.dealerId = dealer.id;
+  room.smallBlindId = sbSeat.id;
+  room.bigBlindId = bbSeat.id;
+  room.blinds = { small, big };
   for (const s of room.seats) {
     s.cards = [];
     s.ops = baseOps();
@@ -183,22 +238,55 @@ export function startHand(room: Room) {
     s.submission = undefined;
   }
   room.phase = 'preflop';
-  log(room, `Hand ${room.hand}: first betting round.`);
-  beginBetting(room);
+  log(room, `Hand ${room.hand}: ${dealer.name} has the button.`, dealer.id);
+
+  // post the blinds. Posting does not count as acting, so the big blind keeps the option to raise.
+  if (small > 0) {
+    pay(room, sbSeat, small);
+    log(room, `${sbSeat.name} posted the small blind of ${small}.`, sbSeat.id);
+  }
+  pay(room, bbSeat, big);
+  room.currentBet = big;
+  log(room, `${bbSeat.name} posted the big blind of ${big}.`, bbSeat.id);
+
+  if (!roundNeedsAction(room)) {
+    advanceAfterBetting(room);
+    return;
+  }
+  room.turn = nextActorAfter(room, bbSeat.id)!.id;
 }
 
+/** first seat after `afterId` (clockwise) that can still act */
+function nextActorAfter(room: Room, afterId: string | null): Seat | undefined {
+  const n = room.seats.length;
+  const start = afterId ? room.seats.findIndex((s) => s.id === afterId) : -1;
+  for (let i = 1; i <= n; i++) {
+    const s = room.seats[(start + i + n) % n];
+    if (canAct(s)) return s;
+  }
+  return undefined;
+}
+
+/** nobody to bet against, or the one player left who can act already has the bet covered */
+function roundNeedsAction(room: Room): boolean {
+  const actors = room.seats.filter(canAct);
+  if (actors.length === 0) return false;
+  if (actors.length === 1) return actors[0].bet < room.currentBet;
+  return true;
+}
+
+/** the second and third betting rounds: bets reset and the player after the button acts first */
 function beginBetting(room: Room) {
   room.currentBet = 0;
   for (const s of room.seats) {
     s.bet = 0;
     s.acted = false;
   }
-  const actors = room.seats.filter(canAct);
-  if (actors.length < 2) {
+  if (!roundNeedsAction(room)) {
     advanceAfterBetting(room);
     return;
   }
-  room.turn = actors[0].id;
+  room.turn = nextActorAfter(room, room.dealerId)!.id;
 }
 
 function advanceAfterBetting(room: Room) {
@@ -281,13 +369,16 @@ function resolveSwap(room: Room, seat: Seat, op: 'add' | 'subtract' | null) {
 
 export interface BettingLimits {
   callAmount: number;
+  /** the smallest legal raise: the big blind, or everything that can be raised if that is less */
+  minRaise: number;
   maxRaise: number;
 }
 
 export function bettingLimits(room: Room, seat: Seat): BettingLimits {
   const callAmount = Math.max(0, room.currentBet - seat.bet);
   const cap = Math.min(...inHand(room).map((s) => s.chips + s.bet));
-  return { callAmount, maxRaise: Math.max(0, cap - room.currentBet) };
+  const maxRaise = Math.max(0, cap - room.currentBet);
+  return { callAmount, minRaise: Math.min(room.blinds.big, maxRaise), maxRaise };
 }
 
 function pay(room: Room, seat: Seat, amount: number) {
@@ -563,7 +654,7 @@ export function act(room: Room, playerId: string, action: Action) {
   if (!BETTING.includes(room.phase)) throw new GameError('Betting is closed right now.');
   if (room.turn !== seat.id) throw new GameError('It is not your turn.');
 
-  const { callAmount, maxRaise } = bettingLimits(room, seat);
+  const { callAmount, minRaise, maxRaise } = bettingLimits(room, seat);
   switch (action.type) {
     case 'fold':
       doFold(room, seat, 'fold');
@@ -578,6 +669,7 @@ export function act(room: Room, playerId: string, action: Action) {
       const amount = action.amount;
       if (!Number.isInteger(amount) || amount < 1) throw new GameError('Raise by a whole number of chips.');
       if (amount > maxRaise) throw new GameError(`The most you can raise is ${maxRaise}.`);
+      if (amount < minRaise) throw new GameError(`The smallest raise is ${minRaise}, the big blind.`);
       pay(room, seat, callAmount + amount);
       room.currentBet += amount;
       for (const s of room.seats) if (s.id !== seat.id) s.acted = false;

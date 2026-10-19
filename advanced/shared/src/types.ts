@@ -108,6 +108,12 @@ export interface Room {
   code: string;
   hostId: string;
   phase: Phase;
+  /** the dealer button; moves to the next seated player every hand */
+  dealerId: string | null;
+  smallBlindId: string | null;
+  bigBlindId: string | null;
+  /** the blinds for the current hand (scaled down if the shortest stack cannot cover them) */
+  blinds: { small: number; big: number };
   /** hands played so far in this match */
   hand: number;
   seats: Seat[];

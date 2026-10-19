@@ -108,7 +108,7 @@ class Player {
     } else if (v.betting && v.turn === v.you) {
       const r = Math.random();
       if (r < 0.1) cmd = { type: 'fold' };
-      else if (r < 0.35 && v.betting.maxRaise >= 1) cmd = { type: 'raise', amount: Math.min(v.betting.maxRaise, 1 + Math.floor(Math.random() * 60)) };
+      else if (r < 0.35 && v.betting.maxRaise >= 1) cmd = { type: 'raise', amount: Math.min(v.betting.maxRaise, v.betting.minRaise + Math.floor(Math.random() * 60)) };
       else cmd = { type: 'call' };
     } else if (v.phase === 'equation' && !me.folded && !me.submitted) {
       const hand = [...me.cards.filter((c) => c.kind !== 'hidden'), ...me.ops] as any[];

@@ -13,6 +13,9 @@ export interface PlayerView {
   connected: boolean;
   chips: number;
   bet: number;
+  isDealer: boolean;
+  isSmallBlind: boolean;
+  isBigBlind: boolean;
   folded: boolean;
   foldedBy?: FoldReason;
   allIn: boolean;
@@ -41,7 +44,9 @@ export interface RoomView {
   matchWinnerId: string | null;
   log: LogEntry[];
   /** only filled in when it is your turn to bet */
-  betting: { callAmount: number; maxRaise: number } | null;
+  betting: { callAmount: number; minRaise: number; maxRaise: number } | null;
+  /** the blinds for this hand */
+  blinds: { small: number; big: number };
   limits: { maxPlayers: number; startingChips: number };
 }
 
@@ -69,6 +74,9 @@ export function buildView(room: Room, viewerId: string): RoomView {
       connected: s.connected,
       chips: s.chips,
       bet: s.bet,
+      isDealer: room.dealerId === s.id && room.phase !== 'waiting',
+      isSmallBlind: room.smallBlindId === s.id && room.phase !== 'waiting',
+      isBigBlind: room.bigBlindId === s.id && room.phase !== 'waiting',
       folded: s.folded,
       foldedBy: s.foldedBy,
       allIn: s.allIn,
@@ -100,6 +108,7 @@ export function buildView(room: Room, viewerId: string): RoomView {
     matchWinnerId: room.matchWinnerId,
     log: room.log.slice(-30),
     betting: isBettingTurn ? bettingLimits(room, viewerSeat!) : null,
+    blinds: room.blinds,
     limits: { maxPlayers: MAX_PLAYERS, startingChips: STARTING_CHIPS },
   };
 }

@@ -5,6 +5,9 @@ export const COLORS: CardColor[] = ['gold', 'silver', 'bronze', 'dark'];
 export const COLOR_RANK: Record<CardColor, number> = { dark: 0, bronze: 1, silver: 2, gold: 3 };
 
 export const STARTING_CHIPS = 1000;
+/** posted automatically every hand; the minimum raise is the big blind */
+export const SMALL_BLIND = 5;
+export const BIG_BLIND = 10;
 export const MAX_PLAYERS = 8;
 export const MIN_PLAYERS = 2;
 

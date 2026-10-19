@@ -12,13 +12,27 @@ equation maths and the payouts match the original code (see [Verification](#veri
 
 ### A hand
 
-1. **Betting round 1**, before any cards.
+1. **Betting round 1**, before any cards, after the blinds are posted (see below).
 2. Deal number cards until everyone has **2**. **Betting round 2.**
 3. Deal until everyone has **4**. **Betting round 3.**
 4. Everyone builds an equation, chooses **small**, **big** or **both**, and locks it in.
 5. Equations are revealed and the pot is paid out.
 
 Betting is Texas Hold'em style: fold, check or call, or raise. A raise is "raise by N" on top of the bet to match.
+
+### Blinds and the button (added on request)
+
+The original had no forced bets, so a table of cautious players could check every hand and nothing ever moved. Blinds fix that.
+
+- A **dealer button** moves one seat clockwise every hand, skipping players who are out of chips or sitting out. If the dealer
+  leaves, the button carries on from where it was.
+- The next two players post a **small blind (5)** and a **big blind (10)**. Heads-up, the dealer posts the small blind.
+- Before the first cards the player after the big blind acts first, and the **big blind keeps the option to raise** when the action
+  comes back around. After that, the first player to act in each round is the one after the button.
+- The **minimum raise is the big blind** (or everything that can be raised, if that is less).
+- If the shortest stack cannot cover the blinds, both blinds shrink to fit it. That keeps every bet fully matched, so there are
+  never side pots. (A simplification: real poker would use side pots.)
+- Blinds are constant. Raising them over time is easy to add if matches drag on.
 
 ### Special cards
 
@@ -58,11 +72,11 @@ Betting is Texas Hold'em style: fold, check or call, or raise. A raise is "raise
 | Special cards in the deck | 4 division, 4 square root | **4 multiply, 4 square root** |
 | Drawing the swap card | trade it for a card you hold | trade **add or subtract** for multiply, or decline |
 | Hidden card | the last number card | the **first** number card |
-| First betting round | everyone pays 1 chip | **no ante**: an ordinary betting round |
+| First betting round | everyone pays 1 chip | no ante in the original; this rebuild uses **blinds** (5 and 10) instead, see above |
 | Small tie | smallest card's colour, gold biggest | lowest card wins, then dark beats gold |
 
-A consequence of "no ante": a hand where everyone only checks has an empty pot, so nothing changes hands. The UI says so.
-Switching to the spec's 1-chip ante is a small change if you want it.
+The original's lack of any forced bet meant an all-check hand had an empty pot. Blinds replace both the spec's 1-chip ante and
+that behaviour, so every hand has something to win.
 
 ## Deliberate deviations from the 2023 code
 

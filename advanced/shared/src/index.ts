@@ -5,3 +5,4 @@ export * from './settle';
 export * from './engine';
 export * from './bot';
 export * from './views';
+export * from './protocol';

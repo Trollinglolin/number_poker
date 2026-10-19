@@ -99,17 +99,25 @@ export function removePlayer(room: Room, id: string) {
   if (room.phase === 'waiting' || room.phase === 'ended') {
     room.seats = room.seats.filter((s) => s.id !== id);
     log(room, `${seat.name} left the table.`, id);
-    if (room.hostId === id) {
-      const next = room.seats.find((s) => !s.isBot && s.connected) ?? room.seats.find((s) => !s.isBot);
-      if (next) room.hostId = next.id;
-    }
+    reassignHost(room);
     return;
   }
+  seat.left = true;
+  seat.connected = false;
+  log(room, `${seat.name} left the table.`, id);
   forceAct(room, id, 'timeout');
+}
+
+function reassignHost(room: Room) {
+  if (room.seats.some((s) => s.id === room.hostId && !s.left)) return;
+  const next = room.seats.find((s) => !s.isBot && s.connected) ?? room.seats.find((s) => !s.isBot);
+  if (next) room.hostId = next.id;
 }
 
 export function resetMatch(room: Room) {
   if (room.phase !== 'waiting' && room.phase !== 'ended') throw new GameError('Finish the current hand first.');
+  room.seats = room.seats.filter((s) => !s.left);
+  reassignHost(room);
   for (const s of room.seats) {
     s.chips = STARTING_CHIPS;
     s.eliminated = false;
@@ -138,9 +146,14 @@ export function resetMatch(room: Room) {
 export function startHand(room: Room) {
   if (room.phase !== 'waiting' && room.phase !== 'ended') throw new GameError('A hand is already in progress.');
   if (room.matchWinnerId) throw new GameError('The match is over. Reset chips to play again.');
+  room.seats = room.seats.filter((s) => !s.left);
+  reassignHost(room);
   for (const s of room.seats) if (s.chips <= 0) s.eliminated = true;
-  const playing = room.seats.filter((s) => !s.eliminated);
-  if (playing.length < MIN_PLAYERS) throw new GameError('At least two players with chips are needed.');
+  // someone who is disconnected when the hand starts sits it out instead of stalling the table
+  const present = (s: Seat) => !s.eliminated && (s.isBot || s.connected);
+  if (room.seats.filter(present).length < MIN_PLAYERS) {
+    throw new GameError('At least two players with chips are needed.');
+  }
 
   room.deck = createDeck(room.rng);
   room.hand += 1;
@@ -154,8 +167,8 @@ export function startHand(room: Room) {
     s.ops = baseOps();
     s.bet = 0;
     s.committed = 0;
-    s.folded = s.eliminated;
-    s.foldedBy = undefined;
+    s.folded = !present(s);
+    s.foldedBy = s.folded && !s.eliminated ? 'timeout' : undefined;
     s.allIn = false;
     s.acted = false;
     s.sqrtFlag = false;

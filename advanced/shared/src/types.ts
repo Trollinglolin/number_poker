@@ -49,6 +49,8 @@ export interface Seat {
   foldedBy?: FoldReason;
   allIn: boolean;
   eliminated: boolean;
+  /** left mid-hand: folded now, removed when the next hand is dealt */
+  left?: boolean;
   acted: boolean;
   /** number cards, plus any square root / multiply cards, in dealt order */
   cards: Card[];

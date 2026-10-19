@@ -1,0 +1,15 @@
+# Render Blueprint (template, not yet used). Render expects this file at the repository root,
+# so copy it there, or create the service by hand with the same settings.
+services:
+  - type: web
+    name: number-poker
+    runtime: docker
+    rootDir: advanced
+    dockerfilePath: ./Dockerfile
+    # the free plan sleeps and drops every game in progress; use a paid plan
+    plan: starter
+    numInstances: 1 # game state is in memory: keep this at 1
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production

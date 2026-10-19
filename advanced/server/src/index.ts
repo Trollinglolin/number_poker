@@ -63,7 +63,8 @@ if (existsSync(path.join(config.webDist, 'index.html'))) {
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   app.get(/^\/(?!socket\.io|healthz).*/, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(config.webDist, 'index.html'));
+    // `root` keeps the dotfile check relative to the web folder, wherever it is deployed
+    res.sendFile('index.html', { root: config.webDist });
   });
 } else {
   app.get('/', (_req, res) => {

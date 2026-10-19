@@ -83,6 +83,8 @@ export interface ShowdownPlayer {
   big?: { expr: string; value: number; diff: number };
   /** number cards, so everyone can see the tiebreak colours */
   cards: Card[];
+  /** chips this player put in this hand */
+  committed: number;
   payout: number;
 }
 

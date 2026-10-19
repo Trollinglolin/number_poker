@@ -1,0 +1,256 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/*
+ * Design tokens. One accent (mint), two semantic pool colours (small = sky, big = coral),
+ * neutrals tinted toward green. Shape rule: controls are pills, inputs 16px, panels 28px
+ * with a 24px inner core, playing cards 10px.
+ */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0f0d;
+  --surface: #101814;
+  --surface-2: #16211c;
+  --surface-3: #1e2c26;
+  --line: rgb(233 240 236 / 0.09);
+  --line-strong: rgb(233 240 236 / 0.17);
+  --text: #e9f0ec;
+  --muted: #98ab9f;
+  --faint: #7a8f84;
+  --accent: #4fdc9a;
+  --accent-ink: #04140c;
+  --small: #78c0f0;
+  --big: #f59271;
+  --danger: #f2727c;
+  --shadow: 0 24px 60px -24px rgb(0 0 0 / 0.7);
+  --glow: rgb(79 220 154 / 0.07);
+  --felt: radial-gradient(120% 90% at 50% 0%, #17281f 0%, #101814 55%, #0d1511 100%);
+  --op-card: linear-gradient(160deg, #22352c, #172620);
+  --op-ink: #8ff0c0;
+  --back: repeating-linear-gradient(135deg, #1c2a24 0 6px, #16211c 6px 12px);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f1f5f2;
+  --surface: #ffffff;
+  --surface-2: #e8eeea;
+  --surface-3: #dde6e0;
+  --line: rgb(14 26 20 / 0.1);
+  --line-strong: rgb(14 26 20 / 0.19);
+  --text: #0e1a14;
+  --muted: #4d6056;
+  --faint: #62756b;
+  --accent: #0b8c58;
+  --accent-ink: #ffffff;
+  --small: #17669f;
+  --big: #b3451c;
+  --danger: #c02a38;
+  --shadow: 0 24px 50px -24px rgb(18 60 40 / 0.28);
+  --glow: rgb(11 140 88 / 0.08);
+  --felt: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #eef4f0 60%, #e3ece6 100%);
+  --op-card: linear-gradient(160deg, #e7f1ec, #d5e5dc);
+  --op-ink: #0b6b44;
+  --back: repeating-linear-gradient(135deg, #dbe6df 0 6px, #cfdcd4 6px 12px);
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-small: var(--small);
+  --color-big: var(--big);
+  --color-danger: var(--danger);
+  --ease-out-expo: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* soft light behind everything; fixed, so it never repaints on scroll */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 12% -10%, var(--glow), transparent 70%),
+    radial-gradient(50% 40% at 100% 0%, var(--glow), transparent 70%);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- playing cards */
+
+.pcard {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex: none;
+  user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -1px 0 rgb(0 0 0 / 0.18),
+    0 6px 14px -6px rgb(0 0 0 / 0.45);
+}
+.pcard-gold {
+  background: linear-gradient(155deg, #f8dc82 0%, #e0b043 52%, #b98a22 100%);
+  color: #3a2a05;
+  border: 1px solid #f6e3a4;
+}
+.pcard-silver {
+  background: linear-gradient(155deg, #f1f4f6 0%, #c4ccd2 52%, #9aa4ac 100%);
+  color: #1b2328;
+  border: 1px solid #e4e9ec;
+}
+.pcard-bronze {
+  background: linear-gradient(155deg, #eab184 0%, #c27c46 52%, #94582a 100%);
+  color: #2e1505;
+  border: 1px solid #efc29e;
+}
+.pcard-dark {
+  background: linear-gradient(155deg, #343a3f 0%, #1f2428 52%, #121518 100%);
+  color: #eef2f4;
+  border: 1px solid #454d54;
+}
+.pcard-op {
+  background: var(--op-card);
+  color: var(--op-ink);
+  border: 1px solid var(--line-strong);
+}
+.pcard-back {
+  background: var(--back);
+  border: 1px solid var(--line-strong);
+  color: var(--faint);
+}
+
+/* --------------------------------------------------------------- motion bits */
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.015);
+  }
+}
+.turn-ring {
+  animation: ring-pulse 1.8s var(--ease-out-expo, ease) infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-ring {
+    animation: none;
+    opacity: 0.8;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* native dialogs: centred card on desktop, bottom sheet on phones */
+dialog.sheet {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  max-width: none;
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+dialog.sheet::backdrop {
+  background: rgb(4 8 6 / 0.62);
+  backdrop-filter: blur(6px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  dialog.sheet::backdrop {
+    backdrop-filter: none;
+    background: rgb(4 8 6 / 0.85);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sheet-panel {
+  animation: sheet-in 0.5s var(--ease-out-expo, cubic-bezier(0.32, 0.72, 0, 1)) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+.scroll-hide {
+  scrollbar-width: none;
+}
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+}

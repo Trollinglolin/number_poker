@@ -333,6 +333,7 @@ function finishByFold(room: Room, winner: Seat | undefined) {
       folded: s.folded,
       foldedBy: s.foldedBy,
       cards: [],
+      committed: s.committed,
       payout: 0,
     }));
   const payouts: Record<string, number> = {};
@@ -343,7 +344,11 @@ function finishByFold(room: Room, winner: Seat | undefined) {
     winner.chips += room.pot;
     payouts[winner.id] = room.pot;
     players.find((p) => p.id === winner.id)!.payout = room.pot;
-    explanation.push(`Everyone else folded, so ${winner.name} takes the pot of ${room.pot}.`);
+    explanation.push(
+      room.pot === 0
+        ? 'Everyone else folded, but nobody had bet, so no chips change hands.'
+        : `Everyone else folded, so ${winner.name} takes the pot of ${room.pot}.`,
+    );
   } else {
     // nobody left (everyone forfeited): give each player back what they put in
     kind = 'refund';
@@ -462,6 +467,7 @@ function resolveShowdown(room: Room) {
         diff: Math.abs(x.submission.big.value - 20),
       },
       cards: x.cards.filter(isNumber),
+      committed: x.committed,
       payout: s.payouts[x.id] ?? 0,
     }));
 
@@ -483,6 +489,10 @@ function explain(room: Room, s: ReturnType<typeof settle>): string[] {
   const n = (id?: string) => (id ? nameOf(room, id) : 'nobody');
   const out: string[] = [];
   const pot = room.pot;
+  if (pot === 0) {
+    // the original has no ante, so a hand where everyone only checks has nothing to win
+    return ['Nobody put chips in the pot, so no chips change hands.'];
+  }
   switch (s.branch) {
     case 'all-small':
       out.push(`Everyone bet small. ${n(s.smallWinnerId)} is closest to 1 and takes the whole pot of ${pot}.`);

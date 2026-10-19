@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { act, addPlayer, bettingLimits, createRoom, forceAct, isBlocking, removePlayer, resetMatch, startHand } from '../src/engine';
+import {
+  act,
+  addPlayer,
+  addSpectator,
+  bettingLimits,
+  createRoom,
+  forceAct,
+  isBlocking,
+  removePlayer,
+  resetMatch,
+  startHand,
+} from '../src/engine';
 import { botAction } from '../src/bot';
 import { buildView } from '../src/views';
 import { createDeck, isNumber, numberCards } from '../src/cards';
@@ -303,6 +314,49 @@ describe('views hide what they must', () => {
     const end = buildView(room, 'p1');
     expect(end.players.find((p) => p.id === 'p0')!.cards.some((c) => c.kind === 'hidden')).toBe(false);
     expect(end.result?.players.find((p) => p.id === 'p0')?.big?.value).toBeCloseTo(13.3333, 3);
+  });
+});
+
+describe('folded players keep their cards secret at the showdown', () => {
+  it('does not reveal a folded player hidden card to anyone', () => {
+    const room = table(3);
+    startHand(room);
+    // p0: 3 5 2 9   p1: 4 6 7 1   p2 (folds on the last round): 8 10 0 1
+    stack(room, ['n3g', 'n5s', 'n4g', 'n6s', 'n8b', 'n10d', 'n2b', 'n9d', 'n7b', 'n1d', 'n0g', 'n1s']);
+    for (const p of ['p0', 'p1', 'p2']) act(room, p, { type: 'call' });
+    for (const p of ['p0', 'p1', 'p2']) act(room, p, { type: 'call' });
+    expect(room.phase).toBe('betting2');
+    act(room, 'p0', { type: 'call' });
+    act(room, 'p1', { type: 'call' });
+    act(room, 'p2', { type: 'fold' });
+    expect(room.phase).toBe('equation');
+    act(room, 'p0', { type: 'submit', betType: 'big', big: ['n9d', 'add', 'n5s', 'subtract', 'n2b', 'divide', 'n3g'] });
+    act(room, 'p1', { type: 'submit', betType: 'big', big: ['n7b', 'add', 'n6s', 'subtract', 'n1d', 'divide', 'n4g'] });
+    expect(room.result?.kind).toBe('showdown');
+    for (const viewer of ['p0', 'p1', 'p2']) {
+      const json = JSON.stringify(buildView(room, viewer));
+      if (viewer !== 'p2') {
+        // p2's first-dealt card; their other cards were public all hand
+        expect(json, `viewer ${viewer}`).not.toContain('n8b');
+      }
+    }
+    expect(room.result!.players.find((p) => p.id === 'p2')!.cards).toEqual([]);
+    // the players who did show down are revealed
+    expect(JSON.stringify(buildView(room, 'p1'))).toContain('n3g');
+  });
+});
+
+describe('spectators and a reset', () => {
+  it('lets spectators take a seat when the match is reset', () => {
+    const room = table(2);
+    addSpectator(room, 'watcher', 'Wes');
+    startHand(room);
+    act(room, 'p0', { type: 'fold' });
+    expect(room.phase).toBe('ended');
+    resetMatch(room);
+    expect(room.seats.map((s) => s.id)).toEqual(['p0', 'p1', 'watcher']);
+    expect(room.spectators).toHaveLength(0);
+    expect(seat(room, 'watcher').chips).toBe(1000);
   });
 });
 

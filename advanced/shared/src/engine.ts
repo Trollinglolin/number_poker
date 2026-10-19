@@ -118,6 +118,14 @@ export function resetMatch(room: Room) {
   if (room.phase !== 'waiting' && room.phase !== 'ended') throw new GameError('Finish the current hand first.');
   room.seats = room.seats.filter((s) => !s.left);
   reassignHost(room);
+  // everyone is getting fresh chips anyway, so spectators can take any free seats
+  while (room.spectators.length > 0 && room.seats.length < MAX_PLAYERS) {
+    const spec = room.spectators.shift()!;
+    const seat = newSeat(spec.id, spec.name, false);
+    seat.connected = spec.connected;
+    room.seats.push(seat);
+    log(room, `${spec.name} took a seat.`, spec.id);
+  }
   for (const s of room.seats) {
     s.chips = STARTING_CHIPS;
     s.eliminated = false;
@@ -466,7 +474,8 @@ function resolveShowdown(room: Room) {
         value: x.submission.big.value,
         diff: Math.abs(x.submission.big.value - 20),
       },
-      cards: x.cards.filter(isNumber),
+      // someone who folded never shows their cards, so their hidden card stays hidden
+      cards: x.folded ? [] : x.cards.filter(isNumber),
       committed: x.committed,
       payout: s.payouts[x.id] ?? 0,
     }));

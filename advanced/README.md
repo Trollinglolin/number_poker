@@ -17,7 +17,8 @@ npm run dev          # game server on :3001, web app on http://localhost:5173
 ```
 
 Open the web app, enter a name and choose **Create a table**, or **Practice against a bot** to play alone. Friends join with the
-five-character table code or the invite link.
+five-character table code or the invite link. To try two humans yourself, use a second device, another browser or a private
+window: a second tab in the same browser reuses the first tab's saved seat.
 
 Production build:
 

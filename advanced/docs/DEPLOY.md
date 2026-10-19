@@ -92,7 +92,8 @@ and rejoin their seat automatically when it drops.
 
 ## After deploying
 
-- Open the URL, create a table, and join it from a second device or browser window.
+- Open the URL, create a table, and join it from a second device, a different browser, or a private window. A second tab in the
+  same browser shares the first tab's saved seat (that is what lets a phone rejoin after a reload), so it will not be a second player.
 - Put the service behind your domain with the platform's custom domain feature. HTTPS and WebSockets (`wss://`) work with no
   changes because the client always connects to the page's own origin.
 - Watch the JSON logs (one object per line) for `room created`, `room closed` and any `error` lines.

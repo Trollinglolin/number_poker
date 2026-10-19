@@ -63,7 +63,9 @@ web/      React 19 + Tailwind v4 + Motion: home, lobby and table screens, equati
   blind's option to raise, and a minimum raise equal to the big blind. See [docs/RULES.md](docs/RULES.md).
 - One screen on a normal computer (1024px and wider): the table is sized to fit the window height, your number and operation cards
   sit side by side under it, and a side panel holds fold/check/call/raise, the showdown and the event log. Nothing makes the page
-  scroll. `npm run`-free check: `scripts/fit-check.ts` opens the game at 1366x650, 1440x790 and 1920x970 and asserts it.
+  scroll. To check it yourself, run `scripts/fit-check.ts` (against a running server): it opens the game at several common browser
+  window sizes and asserts the page does not scroll and the key controls are not cut off. Narrower windows (under 1024px, for
+  example a browser snapped to half of a 1920px screen) use the scrolling phone and tablet layout instead.
 - Phone first. The table turns into a portrait oval and grows taller as more people sit (up to 8). Betting controls sit in a bottom
   dock that also carries your own cards, so they are never scrolled out of view. Tap any seat for that player's full cards.
 - The equation builder works by tap, drag or keyboard (arrow keys move a placed card, Delete removes it), shows the live result and

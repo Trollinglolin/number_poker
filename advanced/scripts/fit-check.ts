@@ -11,8 +11,10 @@ import type { Card } from '@numberpoker/shared';
 
 const URL = process.env.URL ?? 'http://localhost:3920';
 const OUT = process.env.OUT ?? './shots';
+const ONLY = process.env.ONLY?.split(',');
 const BOTS = (process.env.BOTS ?? '1,7').split(',').map(Number);
 const SIZES = [
+  { tag: '1280x600', width: 1280, height: 600 },
   { tag: '1366x650', width: 1366, height: 650 },
   { tag: '1440x790', width: 1440, height: 790 },
   { tag: '1920x970', width: 1920, height: 970 },
@@ -113,6 +115,19 @@ async function run(page: Page, tag: string, bots: number) {
       await assertVisible('your hand', page.locator('section[aria-label="Your hand"]'));
       await assertVisible('the Fold button', page.getByRole('button', { name: /Fold/ }));
       const raise = page.getByRole('button', { name: 'Raise', exact: true });
+      // the most crowded table: in the final betting round raise once so every plate shows cards AND a bet
+      const stepLabel = await page.locator('ol[aria-label^="Round progress"]').first().getAttribute('aria-label').catch(() => null);
+      if (/step 5/.test(stepLabel ?? '') && !fits.has('late-raise') && (await raise.isEnabled().catch(() => false))) {
+        fits.add('late-raise');
+        await raise.click();
+        await page.locator('#raise-amount').fill('30');
+        await page.getByRole('button', { name: /Raise by 30/ }).click();
+        await page.waitForTimeout(1500);
+        await assertFit('final-round-bets-1');
+        await page.waitForTimeout(2800);
+        await assertFit('final-round-bets-2');
+        continue;
+      }
       if (!fits.has('betting-raise-open') && (await raise.isEnabled().catch(() => false))) {
         await raise.click();
         await page.waitForTimeout(400);
@@ -129,6 +144,7 @@ async function run(page: Page, tag: string, bots: number) {
 async function main() {
   const browser = await chromium.launch();
   for (const size of SIZES) {
+    if (ONLY && !ONLY.includes(size.tag)) continue;
     for (const bots of BOTS) {
       const ctx = await browser.newContext({
         viewport: { width: size.width, height: size.height },

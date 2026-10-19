@@ -63,7 +63,7 @@ export function RulesSheet({ open, onClose }: { open: boolean; onClose: () => vo
 
         <Section title="A hand">
           <ol className="list-decimal space-y-1.5 pl-5 marker:text-faint">
-            <li>First betting round, before any cards are dealt.</li>
+            <li>The two players after the dealer button post the blinds, then the first betting round, before any cards are dealt.</li>
             <li>Everyone gets two number cards, then a second betting round.</li>
             <li>Everyone gets two more (four in total), then the final betting round.</li>
             <li>Everyone builds an equation, picks small, big or both, and locks it in.</li>
@@ -71,7 +71,21 @@ export function RulesSheet({ open, onClose }: { open: boolean; onClose: () => vo
           </ol>
           <p>
             Betting works like Texas Hold’em: fold, check or call, or raise. You can raise by at most the amount every other
-            player can still match.
+            player can still match, and by at least the big blind.
+          </p>
+        </Section>
+
+        <Section title="Blinds and the button">
+          <p>
+            The <b className="font-medium text-ink">D</b> disc marks the dealer and moves to the next player every hand. The player after
+            it posts the <b className="font-medium text-ink">small blind (5)</b> and the next posts the{' '}
+            <b className="font-medium text-ink">big blind (10)</b>, so every hand has chips to win. Heads-up, the dealer posts the small
+            blind.
+          </p>
+          <p>
+            Before the cards, the player after the big blind acts first, and the big blind still gets to raise when the action comes round.
+            In later rounds the player after the button acts first. If someone is short of chips, both blinds shrink to match the
+            smallest stack.
           </p>
         </Section>
 

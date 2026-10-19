@@ -290,7 +290,7 @@ function HowItPlays() {
           <CoinsIcon size={28} weight="duotone" className="text-accent" aria-hidden />
           <h3 className="mt-5 text-lg font-semibold tracking-tight">Three betting rounds</h3>
           <p className="mt-2 max-w-[44ch] text-[15px] leading-relaxed text-muted">
-            Bet before any cards, after two, and after four. Fold, check, call or raise, just like Hold’em.
+            Blinds start every hand, then you bet before any cards, after two, and after four. Fold, check, call or raise, just like Hold’em.
           </p>
         </div>
 

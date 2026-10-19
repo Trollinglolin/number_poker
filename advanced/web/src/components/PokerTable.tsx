@@ -60,9 +60,25 @@ function Dealt({ from, i, children }: { from: Vec | null; i: number; children: R
   );
 }
 
-function CardsAtSeat({ p, dim, dealFrom, compact }: { p: PlayerView; dim: boolean; dealFrom: Vec | null; compact: boolean }) {
+/** where a seat's small cards go: under the plate, or beside it (towards the middle) on a short, wide table */
+type Side = 'l' | 'r' | 'c';
+
+function CardsAtSeat({ p, dim, dealFrom, compact, side }: { p: PlayerView; dim: boolean; dealFrom: Vec | null; compact: boolean; side: Side }) {
   const dealt = dealtCards(p);
   if (dealt.length === 0 && p.ops.length === 0) return null;
+
+  if (compact && side !== 'c') {
+    // two columns of tiny cards next to the plate: uses width, which a landscape table has, instead of height, which it lacks
+    return (
+      <div className={cn('grid w-[40px] grid-cols-2 content-start gap-0.5', dim && 'opacity-40')}>
+        {dealt.map((c, i) => (
+          <Dealt key={c.id} i={i} from={dealFrom}>
+            <PlayingCard card={c} size="xxs" />
+          </Dealt>
+        ))}
+      </div>
+    );
+  }
 
   if (compact) {
     // tiny cards, enough to read the numbers and spot a multiply or square root
@@ -109,6 +125,7 @@ function SeatPlate({
   onOpen,
   dealFrom,
   compact,
+  side = 'c',
 }: {
   p: PlayerView;
   view: RoomView;
@@ -116,6 +133,7 @@ function SeatPlate({
   onOpen: (id: string) => void;
   dealFrom: Vec | null;
   compact: boolean;
+  side?: Side;
 }) {
   const turn = view.turn === p.id || view.pendingSwap?.playerId === p.id;
   const out = p.folded || p.eliminated;
@@ -124,7 +142,7 @@ function SeatPlate({
   const role = [p.isDealer && 'dealer', p.isSmallBlind && 'small blind', p.isBigBlind && 'big blind'].filter(Boolean).join(', ');
 
   return (
-    <div className="flex flex-col items-center">
+    <div className={cn('flex', side === 'c' ? 'flex-col items-center' : side === 'l' ? 'items-start gap-1.5' : 'flex-row-reverse items-start gap-1.5')}>
       <button
         onClick={() => onOpen(p.id)}
         aria-label={`${p.name}${hero ? ' (you)' : ''}${role ? `, ${role}` : ''}, ${chips(p.chips)} chips${p.bet > 0 && !p.folded ? `, bet ${chips(p.bet)}` : ''}, ${status.text.trim() || 'waiting'}. Show cards.`}
@@ -176,7 +194,7 @@ function SeatPlate({
           </span>
         )}
       </button>
-      {!hero && <CardsAtSeat p={p} dim={out} dealFrom={dealFrom} compact={compact} />}
+      {!hero && <CardsAtSeat p={p} dim={out} dealFrom={dealFrom} compact={compact} side={side} />}
     </div>
   );
 }
@@ -308,6 +326,8 @@ export function PokerTable({ view, centre, emptySeats = 0, onKick, fit = false }
 
   const slotFor = (id: string): SeatSlot | undefined => (id === hero?.id ? HERO_SLOT : slots[others.findIndex((p) => p.id === id)]);
   const at = (s: SeatSlot): Point => (desktop ? s.d : s.m);
+  // on a small landscape table the side seats keep their cards beside the plate, towards the middle
+  const sideOf = (s: SeatSlot): Side => (desktop && compact ? (s.d.x < 36 ? 'l' : s.d.x > 64 ? 'r' : 'c') : 'c');
   /** pixel vector from point a to point b (both in table percentages) */
   const vec = (a: Point, b: Point): Vec => ({ x: ((b.x - a.x) / 100) * box.w, y: ((b.y - a.y) / 100) * box.h });
   const CENTRE: Point = { x: 50, y: 50 };
@@ -378,7 +398,7 @@ export function PokerTable({ view, centre, emptySeats = 0, onKick, fit = false }
         )}
         {others.map((p, i) => (
           <li key={p.id} className={seatClass} style={place(slots[i])}>
-            <SeatPlate p={p} view={view} onOpen={setOpen} dealFrom={flights && dealing ? vec(at(slots[i]), CENTRE) : null} compact={compact} />
+            <SeatPlate p={p} view={view} onOpen={setOpen} dealFrom={flights && dealing ? vec(at(slots[i]), CENTRE) : null} compact={compact} side={sideOf(slots[i])} />
           </li>
         ))}
         {Array.from({ length: emptySeats }).map((_, i) => (

@@ -14,7 +14,7 @@ export function headline(view: RoomView): { title: string; sub: string } {
     case 'betting1':
     case 'betting2': {
       const round = view.phase === 'preflop' ? 'First' : view.phase === 'betting1' ? 'Second' : 'Final';
-      const sub = view.pot === 0 ? `${round} betting round. The pot is empty, raise to play for chips.` : `${round} betting round`;
+      const sub = `${round} betting round`;
       if (view.turn === me) return { title: 'Your move', sub };
       return { title: `${name(view.turn)} to act`, sub };
     }

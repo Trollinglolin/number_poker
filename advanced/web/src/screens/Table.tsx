@@ -1,17 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from 'motion/react';
-import { EyeIcon } from '../lib/icons';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Command, RoomView } from '@numberpoker/shared';
+import { EyeIcon } from '../lib/icons';
 import { game } from '../lib/client';
 import { ActionDock } from '../components/ActionDock';
 import { EquationBuilder } from '../components/EquationBuilder';
-import { Felt } from '../components/Felt';
+import { EquationRail } from '../components/EquationRail';
 import { Header } from '../components/Header';
-import { MyHand } from '../components/MyHand';
-import { Seat } from '../components/Seat';
+import { HoleCards } from '../components/HoleCards';
+import { PokerTable } from '../components/PokerTable';
 import { Showdown } from '../components/Showdown';
 import { SwapSheet } from '../components/SwapSheet';
 import { Button, Sheet, useToast } from '../components/ui';
+
+/** the latest thing that happened, under the table */
+function EventLine({ view }: { view: RoomView }) {
+  const last = view.log[view.log.length - 1];
+  return (
+    <div className="h-6 text-center text-[13px] leading-6 text-muted" aria-live="polite">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={last?.seq ?? 0}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.25 }}
+          className="block truncate"
+        >
+          {last?.text ?? 'Good luck.'}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function Table({ view }: { view: RoomView }) {
   const toast = useToast();
@@ -29,10 +50,10 @@ export function Table({ view }: { view: RoomView }) {
   );
 
   const me = view.players.find((p) => p.id === view.you);
-  const others = view.players.filter((p) => p.id !== view.you);
   const inHand = !!me && !me.folded && !me.eliminated;
   const betting = view.phase === 'preflop' || view.phase === 'betting1' || view.phase === 'betting2';
   const dockVisible = view.phase === 'ended' || (betting && inHand);
+  const building = view.phase === 'equation' && inHand;
 
   // bring the result into view when a hand ends
   useEffect(() => {
@@ -43,43 +64,35 @@ export function Table({ view }: { view: RoomView }) {
     <div className="flex min-h-dvh flex-col">
       <Header view={view} onLeave={() => setLeaving(true)} />
 
-      <main
-        className={`mx-auto grid w-full max-w-6xl flex-1 content-start gap-5 px-4 pt-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6 ${dockVisible ? 'pb-44' : 'pb-10'}`}
-      >
-        {/* opponents: a swipeable row on phones, a sticky sidebar on large screens so they stay in view */}
-        <aside aria-label="Players" className="lg:order-2 lg:sticky lg:top-[4.5rem] lg:self-start">
-          <div className="scroll-hide -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-1">
-            {(view.isSpectator ? view.players : others).map((p) => (
-              <Seat key={p.id} p={p} view={view} />
-            ))}
+      <main className={`mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-2 pt-4 md:gap-5 md:px-4 ${dockVisible ? 'pb-44' : 'pb-10'}`}>
+        {view.isSpectator && (
+          <div className="mx-2 flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted ring-1 ring-line md:mx-0">
+            <EyeIcon size={18} aria-hidden />
+            You are watching this table. You can join the next match when the host resets it.
           </div>
-        </aside>
+        )}
 
-        <div className="flex min-w-0 flex-col gap-5 lg:order-1 lg:gap-6">
-          {view.isSpectator && (
-            <div className="flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted ring-1 ring-line">
-              <EyeIcon size={18} aria-hidden />
-              You are watching this table. You can join the next match when the host resets it.
-            </div>
-          )}
+        {view.phase === 'equation' ? <EquationRail view={view} /> : <PokerTable view={view} />}
+        <EventLine view={view} />
 
-          <Felt view={view} />
+        {view.phase === 'ended' && (
+          <div ref={showdownRef} className="mx-1 scroll-mt-32 md:mx-0">
+            <Showdown view={view} />
+          </div>
+        )}
 
-          {view.phase === 'ended' && (
-            <div ref={showdownRef} className="scroll-mt-32">
-              <Showdown view={view} />
-            </div>
-          )}
+        {me && building && (
+          <div className="mx-1 md:mx-0">
+            <EquationBuilder key={view.hand} me={me} send={send} />
+          </div>
+        )}
+        {me && view.phase === 'equation' && !inHand && (
+          <p className="mx-2 rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted ring-1 ring-line md:mx-0">
+            You are out of this hand. The remaining players are building their equations.
+          </p>
+        )}
 
-          {me && view.phase === 'equation' && inHand && <EquationBuilder key={view.hand} me={me} send={send} />}
-          {me && view.phase === 'equation' && !inHand && (
-            <p className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted ring-1 ring-line">
-              You are out of this hand. The remaining players are building their equations.
-            </p>
-          )}
-
-          {me && <MyHand me={me} view={view} />}
-        </div>
+        {me && !building && <HoleCards me={me} view={view} />}
       </main>
 
       <ActionDock view={view} send={send} />

@@ -75,6 +75,10 @@
   --color-small: var(--small);
   --color-big: var(--big);
   --color-danger: var(--danger);
+  --color-felt-ink: var(--felt-ink);
+  --color-felt-muted: var(--felt-muted);
+  --color-felt-accent: var(--felt-accent);
+  --color-felt-accent-ink: var(--felt-accent-ink);
   --ease-out-expo: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
@@ -165,6 +169,70 @@ body::before {
   background: var(--back);
   border: 1px solid var(--line-strong);
   color: var(--faint);
+}
+
+/* --------------------------------------------------------------- the table */
+
+/* The table is a physical object, so it stays dark green in both themes. */
+:root {
+  --felt-ink: #eaf2ed;
+  --felt-muted: #a9c0b3;
+  --felt-accent: #4fdc9a;
+  --felt-accent-ink: #04140c;
+}
+
+.table-box {
+  aspect-ratio: var(--ma, 3 / 4);
+}
+@media (min-width: 768px) {
+  .table-box {
+    aspect-ratio: var(--da, 2 / 1);
+  }
+}
+
+.rail {
+  background: linear-gradient(165deg, #333d38 0%, #18201c 50%, #0b0f0d 100%);
+  box-shadow:
+    inset 0 2px 0 rgb(255 255 255 / 0.14),
+    inset 0 -4px 10px rgb(0 0 0 / 0.65),
+    0 36px 70px -28px rgb(0 0 0 / 0.85),
+    0 0 0 1px rgb(255 255 255 / 0.07);
+}
+
+.felt {
+  background: radial-gradient(110% 95% at 50% 38%, #228259 0%, #176346 46%, #0c3b2a 100%);
+  box-shadow:
+    inset 0 0 70px rgb(0 0 0 / 0.55),
+    inset 0 0 0 2px rgb(0 0 0 / 0.4);
+  overflow: hidden;
+}
+/* fine cloth grain, on the static felt only */
+.felt::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+/* the stitched line a card room puts around the playing area */
+.felt::after {
+  content: '';
+  position: absolute;
+  inset: 5%;
+  border-radius: 50%;
+  border: 2px dashed rgb(255 255 255 / 0.13);
+  pointer-events: none;
+}
+
+.plate {
+  color: var(--felt-ink);
+  background: linear-gradient(180deg, rgb(15 24 19 / 0.95), rgb(8 13 10 / 0.95));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 10px 20px -10px rgb(0 0 0 / 0.8);
+  border: 1px solid rgb(255 255 255 / 0.1);
 }
 
 /* --------------------------------------------------------------- motion bits */

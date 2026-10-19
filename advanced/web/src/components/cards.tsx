@@ -4,9 +4,10 @@ import { OP_NAME, OP_SYMBOL } from '@numberpoker/shared';
 import type { CardView } from '@numberpoker/shared';
 import { cn } from '../lib/format';
 
-export type CardSize = 'xs' | 'sm' | 'md' | 'lg';
+export type CardSize = 'xxs' | 'xs' | 'sm' | 'md' | 'lg';
 
 const box: Record<CardSize, string> = {
+  xxs: 'h-6 w-[18px] text-[11px] rounded-[4px]!',
   xs: 'h-11 w-8 text-base',
   sm: 'h-[62px] w-11 text-xl',
   md: 'h-[88px] w-[62px] text-3xl',
@@ -34,7 +35,7 @@ export function PlayingCard({ card, size = 'md', className, muted }: CardProps) 
   if (card.kind === 'hidden') {
     return (
       <span role="img" aria-label="Hidden card" className={cn('pcard pcard-back', box[size], className)}>
-        <EyeSlashIcon size={size === 'xs' ? 12 : 20} aria-hidden />
+        <EyeSlashIcon size={size === 'xxs' ? 9 : size === 'xs' ? 12 : 20} aria-hidden />
       </span>
     );
   }

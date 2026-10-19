@@ -194,14 +194,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 /* ------------------------------------------------------------------ Avatar */
 
-export function Avatar({ name, bot, size = 40, ring }: { name: string; bot?: boolean; size?: number; ring?: boolean }) {
+export function Avatar({ name, bot, size = 40, ring, onFelt }: { name: string; bot?: boolean; size?: number; ring?: boolean; onFelt?: boolean }) {
   return (
     <span
       aria-hidden
       style={{ width: size, height: size, fontSize: size * 0.36 }}
       className={cn(
-        'relative grid shrink-0 place-items-center rounded-full bg-surface-3 font-semibold tracking-tight text-ink ring-1',
-        ring ? 'ring-accent' : 'ring-line-strong',
+        'relative grid shrink-0 place-items-center rounded-full font-semibold tracking-tight ring-1',
+        // on the felt the avatar keeps the dark-table colours in either theme
+        onFelt ? 'bg-[#1d2b25] text-felt-ink' : 'bg-surface-3 text-ink',
+        ring ? (onFelt ? 'ring-felt-accent' : 'ring-accent') : onFelt ? 'ring-white/20' : 'ring-line-strong',
       )}
     >
       {bot ? <RobotIcon size={size * 0.5} /> : initials(name)}

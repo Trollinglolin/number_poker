@@ -101,9 +101,11 @@ describe('commands', () => {
     m.command(code, host.playerId, { type: 'start' });
     m.command(code, host.playerId, { type: 'call' });
     m.command(code, guest.playerId, { type: 'call' });
-    // dealing may pause on a multiply swap; resolve it if so
-    for (const pid of [host.playerId, guest.playerId]) {
-      if (lastState('h').pendingSwap?.playerId === pid) m.command(code, pid, { type: 'noSwap' });
+    // dealing may pause on a multiply swap (more than once); resolve every pause
+    for (let i = 0; i < 6; i++) {
+      const pending = lastState('h').pendingSwap;
+      if (!pending) break;
+      m.command(code, pending.playerId, { type: 'noSwap' });
     }
     const hv = lastState('h');
     const gv = lastState('g');

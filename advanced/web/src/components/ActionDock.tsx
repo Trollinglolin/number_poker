@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowFatLinesUpIcon, ArrowRightIcon, HandshakeIcon, MinusIcon, PlusIcon, ProhibitIcon, TrophyIcon } from '../lib/icons';
-import type { Command, RoomView } from '@numberpoker/shared';
+import type { Command, PlayerView, RoomView } from '@numberpoker/shared';
 import { chips, cn } from '../lib/format';
 import { Button } from './ui';
+import { PlayingCard } from './cards';
 
 interface Props {
   view: RoomView;
@@ -28,7 +29,31 @@ export function ActionDock({ view, send }: Props) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
       <div className="pointer-events-auto mx-auto w-full max-w-2xl rounded-[28px] bg-bg/80 p-1.5 ring-1 ring-line-strong backdrop-blur-xl shadow-[var(--shadow)]">
-        <div className="rounded-[22px] bg-surface/90 p-3">{body}</div>
+        <div className="rounded-[22px] bg-surface/90 p-3">
+          {/* on a phone a full table pushes your own cards off screen, so they ride along in the dock */}
+          {inHand && <MiniHand me={me} />}
+          {body}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniHand({ me }: { me: PlayerView }) {
+  const numbers = me.cards.filter((c) => c.kind === 'number');
+  const others = [...me.cards.filter((c) => c.kind === 'op'), ...me.ops];
+  if (numbers.length === 0) return null;
+  return (
+    <div className="mb-3 flex items-end justify-center gap-3 md:hidden" aria-label="Your cards" role="group">
+      <div className="flex gap-1.5">
+        {numbers.map((c) => (
+          <PlayingCard key={c.id} card={c} size="sm" />
+        ))}
+      </div>
+      <div className="flex gap-1">
+        {others.map((c) => (
+          <PlayingCard key={c.id} card={c} size="xs" />
+        ))}
       </div>
     </div>
   );

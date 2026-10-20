@@ -4,6 +4,7 @@ A realtime multiplayer card game: bet like poker, then build the equation that l
 This is a ground-up rebuild of the original project with the **same rules and the same equation maths**, a new interface,
 and a server that is ready to deploy.
 
+- Picking this project up (status, architecture, decisions, gotchas): [HANDOFF.md](HANDOFF.md). Quick proof that everything works: `npm run verify`
 - Rules as implemented, and the few deliberate fixes: [docs/RULES.md](docs/RULES.md)
 - Deploying (Docker, Render, Fly.io, Railway, Cloud Run): [docs/DEPLOY.md](docs/DEPLOY.md)
 

@@ -18,7 +18,8 @@
     "start": "node server/dist/server.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p shared --noEmit && tsc -p server --noEmit && tsc -p web --noEmit",
-    "e2e": "tsx scripts/e2e.ts"
+    "e2e": "tsx scripts/e2e.ts",
+    "verify": "sh scripts/verify.sh"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
